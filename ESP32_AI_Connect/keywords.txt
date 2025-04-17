@@ -1,0 +1,21 @@
+#######################################
+# Syntax Coloring Map For ESP32_AI_Connect
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+ESP32_AI_Connect	KEYWORD1
+AIPlatform    KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+chat	KEYWORD2
+getLastError	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+PLATFORM_OPENAI	LITERAL1
+PLATFORM_GEMINI	LITERAL1
