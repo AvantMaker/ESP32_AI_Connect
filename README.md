@@ -15,6 +15,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 - OpenAI
 - Google Gemini
 - DeepSeek
+- And more to be included...
 
 ## Features
 
@@ -130,7 +131,7 @@ Edit `ESP32_AI_Connect_config.h` to:
 | Platform | Identifier | Example Models |
 |----------|------------|----------------|
 | OpenAI | `"openai"` | gpt-3.5-turbo, gpt-4 |
-| Google Gemini | `"gemini"` | gemini-pro |
+| Google Gemini | `"gemini"` | gemini-2.0-flash |
 | DeepSeek | `"deepseek"` | deepseek-chat |
 
 ## License
