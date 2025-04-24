@@ -9,12 +9,17 @@ This project is proudly brought to you by the team at **AvantMaker.com**.
 
 Visit us at [AvantMaker.com](https://www.avantmaker.com) where we've crafted a comprehensive collection of Reference and Tutorial materials for the ESP32, a mighty microcontroller that powers countless IoT creations.
 
+---
+
+![AvantMaker ESP32_AI_Connect Connects Your ESP32 with AI!](https://avantmaker.com/wp-content/uploads/2025/04/ESP32_AI_Connect_project_feature_image.png)
+
 ## Overview
 
 ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to interact seamlessly with popular AI APIs including:
 - OpenAI
 - Google Gemini
 - DeepSeek
+- OpenAI-Compatible
 - And more to be included...
 
 ## Features
@@ -41,9 +46,9 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 | OpenAI            | `"openai"`           | gpt-3.5-turbo, gpt-4           | Yes               | Under Development               |
 | Google Gemini     | `"gemini"`           | gemini-2.0-flash                | Under Development                | Under Development               |
 | DeepSeek          | `"deepseek"`         | deepseek-chat                   | No               | Under Development                |
-| OpenAI Compatible | `"openai-compatible"`| Qwen etc.                       | Yes               | Under Development               |
+| OpenAI Compatible | `"openai-compatible"`| qwen etc.                       | Yes               | Under Development               |
 
-**Note: We are working had to add Claude and Hugging Face to the supported platform.**
+**Note: We are working hard to add Anthroic Claude, Grok and Hugging Face to the supported platform.**
 
 ## Installation
 
