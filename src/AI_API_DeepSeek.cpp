@@ -6,7 +6,13 @@
 
 // Note: Includes like ArduinoJson.h, HTTPClient.h are usually pulled in via AI_API_Platform_Handler.h
 
-String AI_API_DeepSeek_Handler::getEndpoint(const String& modelName, const String& apiKey) const {
+String AI_API_DeepSeek_Handler::getEndpoint(const String& modelName, const String& apiKey, const String& customEndpoint) const {
+    // If a custom endpoint is provided, use it
+    if (!customEndpoint.isEmpty()) {
+        return customEndpoint;
+    }
+    
+    // Default DeepSeek endpoint
     return "https://api.deepseek.com/v1/chat/completions";
 }
 
@@ -49,6 +55,7 @@ String AI_API_DeepSeek_Handler::buildRequestBody(const String& modelName, const 
 String AI_API_DeepSeek_Handler::parseResponseBody(const String& responsePayload,
                                                 String& errorMsg, JsonDocument& doc) {
     // Use the provided 'doc' and 'errorMsg' references. Clear doc first.
+    resetState(); // Reset finish reason and tokens before parsing
     doc.clear();
     errorMsg = ""; // Clear previous error
 
@@ -64,9 +71,23 @@ String AI_API_DeepSeek_Handler::parseResponseBody(const String& responsePayload,
         return "";
     }
 
+    // Extract usage (tokens) if available
+    if (doc.containsKey("usage") && doc["usage"].is<JsonObject>()) {
+        JsonObject usage = doc["usage"];
+        if (usage.containsKey("total_tokens")) {
+            _lastTotalTokens = usage["total_tokens"].as<int>(); // Store in base class member
+        }
+    }
+
     // Parse response - DeepSeek follows OpenAI's response format
     if (doc.containsKey("choices") && doc["choices"].is<JsonArray>() && !doc["choices"].isNull() && doc["choices"].size() > 0) {
         JsonObject firstChoice = doc["choices"][0];
+
+        // Extract finish reason if available
+        if (firstChoice.containsKey("finish_reason")) {
+           _lastFinishReason = firstChoice["finish_reason"].as<String>(); // Store in base class member
+        }
+
         if (firstChoice.containsKey("message") && firstChoice["message"].is<JsonObject>()) {
             JsonObject message = firstChoice["message"];
             if (message.containsKey("content") && message["content"].is<const char*>()) {

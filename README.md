@@ -20,6 +20,10 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 ## Features
 
 - **Multi-platform support**: Single interface for different AI providers
+- **Tool calls support**: Enables tool call capabilities with AI models
+- **Expandable framework**: Built to easily accommodate additional model support
+- **Configurable features**: Enable/disable tool calls feature to optimize microcontroller resources
+- **OpenAI-compatible support**: Use alternative platforms by supplying custom endpoints and model names
 - **Memory efficient**: Shared JSON buffers and configurable sizes
 - **Modular design**: Easy to add new AI platforms
 - **Error handling**: Detailed error messages for troubleshooting
@@ -28,6 +32,18 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
   - Max tokens
   - System roles
   - Custom headers
+
+## Supported Platforms
+
+
+| Platform          | Identifier           | Example Models                  | Too Calls Support | Streaming Support |
+|-------------------|----------------------|---------------------------------|-------------------|-------------------|
+| OpenAI            | `"openai"`           | gpt-3.5-turbo, gpt-4           | Yes               | Under Development               |
+| Google Gemini     | `"gemini"`           | gemini-2.0-flash                | Under Development                | Under Development               |
+| DeepSeek          | `"deepseek"`         | deepseek-chat                   | No               | Under Development                |
+| OpenAI Compatible | `"openai-compatible"`| Qwen etc.                       | Yes               | Under Development               |
+
+**Note: We are working had to add Claude and Hugging Face to the supported platform.**
 
 ## Installation
 
@@ -108,31 +124,38 @@ void loop() {
 }
 ```
 
-## Configuration
+## Tool Calls Support
+Tool calls (function calling) enable the AI model to request specific actions from your ESP32 application. This feature allows:
 
-Edit `ESP32_AI_Connect_config.h` to:
-- Enable/disable specific platforms
-- Adjust JSON buffer sizes
-- Set HTTP timeout
+- Two-way interaction : AI can request data or actions from your device
+- Structured data exchange : Receive properly formatted JSON for easy parsing
+- Custom function definitions : Define the tools your application supports
+- Automated handling : Process tool requests and provide results back to the AI
+- Context preservation : Maintain conversation context throughout tool interactions
+This capability is ideal for creating more sophisticated applications where the AI needs to access sensor data, control hardware, or perform calculations using your ESP32.
+
+## Configuration
+Edit ESP32_AI_Connect_config.h to customize the library to your specific needs:
 
 ```cpp
-// Example configuration:
+// Platform support - enable only what you need
 #define USE_AI_API_OPENAI
 #define USE_AI_API_GEMINI
 #define USE_AI_API_DEEPSEEK
 
+// Feature toggles - disable to save resources
+#define ENABLE_TOOL_CALLS     // Enable/disable tool calls support
+#define ENABLE_DEBUG_OUTPUT   // Enable/disable debug messages
+
+// Memory allocation
 #define AI_API_REQ_JSON_DOC_SIZE 1024
 #define AI_API_RESP_JSON_DOC_SIZE 2048
+
+// Network settings
 #define AI_API_HTTP_TIMEOUT_MS 30000
 ```
 
-## Supported Platforms
-
-| Platform | Identifier | Example Models |
-|----------|------------|----------------|
-| OpenAI | `"openai"` | gpt-3.5-turbo, gpt-4 |
-| Google Gemini | `"gemini"` | gemini-2.0-flash |
-| DeepSeek | `"deepseek"` | deepseek-chat |
+Disabling unused platforms or features can significantly reduce memory usage and binary size, making the library more efficient for resource-constrained ESP32 projects.
 
 ## License
 
@@ -144,5 +167,4 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ---
 
-💡 **Pro Tip**: Check out our other ESP32 libraries at [AvantMaker GitHub](https://github.com/avantmaker)!
-```
+💡 **Check out our other ESP32 libraries at [AvantMaker GitHub](https://github.com/avantmaker)!**

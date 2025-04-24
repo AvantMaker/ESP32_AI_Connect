@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+# Code-workspace
+*.code-workspace

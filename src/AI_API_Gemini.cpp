@@ -4,8 +4,13 @@
 
 #ifdef USE_AI_API_GEMINI // Only compile this file's content if flag is set
 
-String AI_API_Gemini_Handler::getEndpoint(const String& modelName, const String& apiKey) const {
-    // Gemini typically includes the API key as a URL parameter
+String AI_API_Gemini_Handler::getEndpoint(const String& modelName, const String& apiKey, const String& customEndpoint) const {
+    // If a custom endpoint is provided, use it
+    if (!customEndpoint.isEmpty()) {
+        return customEndpoint;
+    }
+    
+    // Default Gemini endpoint - Append API Key as query parameter
     return "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
 }
 
@@ -77,6 +82,7 @@ String AI_API_Gemini_Handler::buildRequestBody(const String& modelName, const St
 String AI_API_Gemini_Handler::parseResponseBody(const String& responsePayload,
                                                 String& errorMsg, JsonDocument& doc) {
     // Use the provided 'doc' and 'errorMsg' references. Clear doc first.
+    resetState(); // Reset finish reason and tokens before parsing
     doc.clear();
     errorMsg = ""; // Clear previous error
 
@@ -94,6 +100,14 @@ String AI_API_Gemini_Handler::parseResponseBody(const String& responsePayload,
         return "";
     }
 
+    // Extract usage metadata (including tokens) if available
+    if (doc.containsKey("usageMetadata") && doc["usageMetadata"].is<JsonObject>()) {
+        JsonObject usageMetadata = doc["usageMetadata"];
+        if (usageMetadata.containsKey("totalTokenCount")) {
+            _lastTotalTokens = usageMetadata["totalTokenCount"].as<int>(); // Store in base class member
+        }
+    }
+
     // Extract the content: response -> candidates[0] -> content -> parts[0] -> text
     // Reference: https://ai.google.dev/docs/rest_api_overview#response_body
     if (doc.containsKey("candidates") && doc["candidates"].is<JsonArray>() && !doc["candidates"].isNull() && doc["candidates"].size() > 0) {
@@ -102,6 +116,7 @@ String AI_API_Gemini_Handler::parseResponseBody(const String& responsePayload,
         // --- Check for Finish Reason (Important for Safety/Blocks) ---
         // Reference: https://ai.google.dev/docs/rest_api_overview#finishreason
         if (firstCandidate.containsKey("finishReason")) {
+            _lastFinishReason = firstCandidate["finishReason"].as<String>(); // Store in base class member
             String reason = firstCandidate["finishReason"].as<String>();
             if (reason != "STOP" && reason != "MAX_TOKENS") {
                 // Could be "SAFETY", "RECITATION", "OTHER"
@@ -118,6 +133,13 @@ String AI_API_Gemini_Handler::parseResponseBody(const String& responsePayload,
             if (content.containsKey("parts") && content["parts"].is<JsonArray>() && content["parts"].size() > 0) {
                 JsonObject firstPart = content["parts"][0];
                 if (firstPart.containsKey("text") && firstPart["text"].is<const char*>()) {
+                    // Store the total tokens if available
+                    if (doc.containsKey("usageMetadata") && doc["usageMetadata"].is<JsonObject>()) {
+                        JsonObject usageMetadata = doc["usageMetadata"];
+                        if (usageMetadata.containsKey("totalTokenCount")) {
+                            _totalTokens = usageMetadata["totalTokenCount"].as<int>();
+                        }
+                    }
                     // Success! Return the text.
                     return firstPart["text"].as<String>();
                 } else {
