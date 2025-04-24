@@ -11,7 +11,7 @@ Visit us at [AvantMaker.com](https://www.avantmaker.com) where we've crafted a c
 
 ---
 
-![AvantMaker ESP32_AI_Connect Connects Your ESP32 with AI!](https://avantmaker.com/wp-content/uploads/2025/04/ESP32_AI_Connect_project_feature_image.png)
+![AvantMaker ESP32_AI_Connect Connects Your ESP32 with AI!](https://avantmaker.com/wp-content/uploads/2025/04/ESP32_AI_Connect_project_feature_image.jpg)
 
 ## Overview
 
