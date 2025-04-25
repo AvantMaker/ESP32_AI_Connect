@@ -139,6 +139,18 @@ Tool calls (function calling) enable the AI model to request specific actions fr
 - Context preservation : Maintain conversation context throughout tool interactions
 This capability is ideal for creating more sophisticated applications where the AI needs to access sensor data, control hardware, or perform calculations using your ESP32.
 
+## User Guide
+
+For detailed instructions on how to use this library, please refer to the comprehensive User Guide documents in the `doc/User Guide` folder. The User Guide includes:
+
+- Introduction to the library and its capabilities
+- Basic LLM Chat Implementation
+- Tool Calls Implementation Basics
+- Tool Calls Follow-Up Techniques
+- And more...
+
+These guides provide step-by-step instructions, code examples, and best practices to help you get the most out of the ESP32_AI_Connect library.
+
 ## Configuration
 Edit ESP32_AI_Connect_config.h to customize the library to your specific needs:
 
