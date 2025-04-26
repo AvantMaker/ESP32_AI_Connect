@@ -174,4 +174,584 @@ String AI_API_Gemini_Handler::parseResponseBody(const String& responsePayload,
     return ""; // Return empty string if content not found or error occurred
 }
 
+#ifdef ENABLE_TOOL_CALLS
+String AI_API_Gemini_Handler::buildToolCallsRequestBody(const String& modelName,
+                        const String* toolsArray, int toolsArraySize,
+                        const String& systemMessage, const String& toolChoice,
+                        const String& userMessage, JsonDocument& doc) {
+    // Use the provided 'doc' reference. Clear it first.
+    doc.clear();
+
+    // --- Add System Instruction (Optional) ---
+    if (systemMessage.length() > 0) {
+        JsonObject systemInstruction = doc.createNestedObject("systemInstruction");
+        JsonArray parts = systemInstruction.createNestedArray("parts");
+        JsonObject textPart = parts.createNestedObject();
+        textPart["text"] = systemMessage;
+    }
+
+    // --- Add User Content ---
+    JsonArray contents = doc.createNestedArray("contents");
+    JsonObject userContent = contents.createNestedObject();
+    userContent["role"] = "user";
+    JsonArray userParts = userContent.createNestedArray("parts");
+    JsonObject userTextPart = userParts.createNestedObject();
+    userTextPart["text"] = userMessage;
+
+    // --- Add Tools Array ---
+    // Reference: https://ai.google.dev/docs/function_calling
+    JsonArray tools = doc.createNestedArray("tools");
+    
+    // Create a single tool object with an array of function declarations
+    JsonObject tool = tools.createNestedObject();
+    JsonArray functionDeclarations = tool.createNestedArray("functionDeclarations");
+    
+    // Process each tool definition in the toolsArray
+    for (int i = 0; i < toolsArraySize; i++) {
+        // Parse the tool JSON
+        JsonDocument toolDoc;
+        DeserializationError error = deserializeJson(toolDoc, toolsArray[i]);
+        if (error) {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Error parsing tool JSON: " + String(error.c_str()));
+            Serial.println("Tool JSON: " + toolsArray[i]);
+            #endif
+            continue;
+        }
+        
+        // Extract the function details based on format (simple or nested)
+        String name, description;
+        JsonVariant parameters;
+        
+        if (toolDoc.containsKey("type") && toolDoc.containsKey("function")) {
+            // OpenAI format: {"type":"function", "function":{...}}
+            JsonObject function = toolDoc["function"];
+            
+            if (function.containsKey("name")) {
+                name = function["name"].as<String>();
+            }
+            
+            if (function.containsKey("description")) {
+                description = function["description"].as<String>();
+            }
+            
+            if (function.containsKey("parameters")) {
+                parameters = function["parameters"];
+            }
+        } else {
+            // Simpler format: {"name":"...", "description":"...", "parameters":{...}}
+            if (toolDoc.containsKey("name")) {
+                name = toolDoc["name"].as<String>();
+            }
+            
+            if (toolDoc.containsKey("description")) {
+                description = toolDoc["description"].as<String>();
+            }
+            
+            if (toolDoc.containsKey("parameters")) {
+                parameters = toolDoc["parameters"];
+            }
+        }
+        
+        // Skip if no name was found (required field)
+        if (name.isEmpty()) {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Skipping tool without name");
+            #endif
+            continue;
+        }
+        
+        // Create function declaration object
+        JsonObject functionDeclaration = functionDeclarations.createNestedObject();
+        functionDeclaration["name"] = name;
+        
+        if (description.length() > 0) {
+            functionDeclaration["description"] = description;
+        }
+        
+        if (!parameters.isNull()) {
+            // Convert parameters to Gemini format if needed
+            JsonObject geminiParams = functionDeclaration.createNestedObject("parameters");
+            
+            // Check if we need to convert from OpenAI format to Gemini format
+            if (parameters.containsKey("type") && parameters["type"] == "object") {
+                // OpenAI format uses lowercase types, Gemini uses uppercase
+                geminiParams["type"] = "OBJECT";
+                
+                // Copy properties
+                if (parameters.containsKey("properties")) {
+                    JsonObject srcProps = parameters["properties"];
+                    JsonObject geminiProps = geminiParams.createNestedObject("properties");
+                    
+                    // Copy each property, converting types to uppercase
+                    for (JsonPair kv : srcProps) {
+                        JsonObject srcProp = kv.value().as<JsonObject>();
+                        JsonObject geminiProp = geminiProps.createNestedObject(kv.key().c_str());
+                        
+                        // Convert type to uppercase
+                        if (srcProp.containsKey("type")) {
+                            String type = srcProp["type"].as<String>();
+                            type.toUpperCase(); // Modify the string in place
+                            geminiProp["type"] = type; // Now assign the modified string
+                        }
+                        
+                        // Copy other fields
+                        if (srcProp.containsKey("description")) {
+                            geminiProp["description"] = srcProp["description"];
+                        }
+                        
+                        if (srcProp.containsKey("enum")) {
+                            JsonArray srcEnum = srcProp["enum"];
+                            JsonArray geminiEnum = geminiProp.createNestedArray("enum");
+                            for (JsonVariant enumVal : srcEnum) {
+                                geminiEnum.add(enumVal);
+                            }
+                        }
+                    }
+                }
+                
+                // Copy required array
+                if (parameters.containsKey("required")) {
+                    JsonArray srcRequired = parameters["required"];
+                    JsonArray geminiRequired = geminiParams.createNestedArray("required");
+                    for (JsonVariant req : srcRequired) {
+                        geminiRequired.add(req);
+                    }
+                }
+            } else {
+                // Assume parameters are already in Gemini format, copy directly
+                for (JsonPair kv : parameters.as<JsonObject>()) {
+                    if (kv.value().is<JsonObject>()) {
+                        JsonObject subObj = geminiParams.createNestedObject(kv.key().c_str());
+                        for (JsonPair subKv : kv.value().as<JsonObject>()) {
+                            subObj[subKv.key().c_str()] = subKv.value();
+                        }
+                    } else if (kv.value().is<JsonArray>()) {
+                        JsonArray arr = geminiParams.createNestedArray(kv.key().c_str());
+                        for (JsonVariant item : kv.value().as<JsonArray>()) {
+                            arr.add(item);
+                        }
+                    } else {
+                        geminiParams[kv.key().c_str()] = kv.value();
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Tool Choice (if specified) ---
+    if (toolChoice.length() > 0 && toolChoice != "auto") {
+        JsonDocument toolChoiceDoc;
+        DeserializationError error = deserializeJson(toolChoiceDoc, toolChoice);
+        if (!error) {
+            if (toolChoiceDoc.containsKey("type") && toolChoiceDoc["type"] == "function") {
+                // Add toolChoice configuration
+                JsonObject toolChoiceObj = doc.createNestedObject("toolConfig");
+                toolChoiceObj["toolChoice"] = "any"; // Gemini doesn't support exact function selection like OpenAI
+            }
+        }
+    }
+
+    String requestBody;
+    serializeJson(doc, requestBody);
+    
+    #ifdef ENABLE_DEBUG_OUTPUT
+    Serial.println("Gemini Tool Calls Request Body:");
+    Serial.println(requestBody);
+    #endif
+    
+    return requestBody;
+}
+
+String AI_API_Gemini_Handler::parseToolCallsResponseBody(const String& responsePayload,
+                                 String& errorMsg, JsonDocument& doc) {
+    // Use the provided 'doc' and 'errorMsg' references. Clear doc first.
+    resetState(); 
+    doc.clear();
+    errorMsg = "";
+
+    DeserializationError error = deserializeJson(doc, responsePayload);
+    if (error) {
+        errorMsg = "JSON Deserialization failed: " + String(error.c_str());
+        return "";
+    }
+
+    // Check for top-level API errors first
+    if (doc.containsKey("error")) {
+        errorMsg = String("API Error: ") + (doc["error"]["message"] | "Unknown error");
+        return "";
+    }
+
+    // Extract usage metadata if available
+    if (doc.containsKey("usageMetadata") && doc["usageMetadata"].is<JsonObject>()) {
+        JsonObject usageMetadata = doc["usageMetadata"];
+        if (usageMetadata.containsKey("totalTokenCount")) {
+            _lastTotalTokens = usageMetadata["totalTokenCount"].as<int>();
+        }
+    }
+
+    // Create a new result object with tool calls
+    JsonDocument resultDoc;
+    JsonArray toolCalls = resultDoc.createNestedArray("tool_calls");
+    bool hasFunctionCall = false;
+    
+    // Extract function calls from candidates[0] -> content
+    if (doc.containsKey("candidates") && doc["candidates"].is<JsonArray>() && 
+        doc["candidates"].size() > 0 && doc["candidates"][0].containsKey("content")) {
+        
+        // Store the original finish reason from Gemini
+        if (doc["candidates"][0].containsKey("finishReason")) {
+            String geminiFinishReason = doc["candidates"][0]["finishReason"].as<String>();
+            
+            // For debugging
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Original Gemini finishReason: " + geminiFinishReason);
+            #endif
+        }
+        
+        JsonObject content = doc["candidates"][0]["content"];
+        
+        // Handle function calls (if any)
+        if (content.containsKey("parts") && content["parts"].is<JsonArray>()) {
+            JsonArray parts = content["parts"];
+            
+            for (JsonVariant part : parts) {
+                if (part.containsKey("functionCall")) {
+                    JsonObject functionCall = part["functionCall"];
+                    hasFunctionCall = true;
+                    
+                    JsonObject toolCall = toolCalls.createNestedObject();
+                    toolCall["type"] = "function";
+                    
+                    if (functionCall.containsKey("name")) {
+                        JsonObject function = toolCall.createNestedObject("function");
+                        function["name"] = functionCall["name"].as<String>();
+                        
+                        if (functionCall.containsKey("args")) {
+                            String args;
+                            serializeJson(functionCall["args"], args);
+                            function["arguments"] = args;
+                        }
+                    }
+                }
+            }
+            
+            // If we found function calls, set the finish reason to "tool_calls"
+            if (hasFunctionCall) {
+                _lastFinishReason = "tool_calls";
+            } else {
+                // No function calls found, check if there's text content
+                bool hasTextContent = false;
+                for (JsonVariant part : parts) {
+                    if (part.containsKey("text")) {
+                        hasTextContent = true;
+                        
+                        // Return text content directly
+                        _lastFinishReason = "stop";
+                        return part["text"].as<String>();
+                    }
+                }
+                
+                if (!hasTextContent) {
+                    errorMsg = "Response contained neither function calls nor text content";
+                    return "";
+                }
+            }
+        } else {
+            errorMsg = "Could not find 'parts' array in response 'content'";
+            return "";
+        }
+    } else {
+        errorMsg = "Invalid Gemini response format: Missing 'candidates' or expected content structure";
+        return "";
+    }
+    
+    // Only serialize the tool calls if we found any
+    if (hasFunctionCall) {
+        String resultJson;
+        serializeJson(toolCalls, resultJson);
+        return resultJson;
+    } else {
+        // If we reached here without returning, something went wrong
+        if (errorMsg.isEmpty()) {
+            errorMsg = "No valid content found in response";
+        }
+        return "";
+    }
+}
+
+String AI_API_Gemini_Handler::buildToolCallsFollowUpRequestBody(const String& modelName,
+                        const String* toolsArray, int toolsArraySize,
+                        const String& systemMessage, const String& toolChoice,
+                        const String& lastUserMessage,
+                        const String& lastAssistantToolCallsJson,
+                        const String& toolResultsJson,
+                        JsonDocument& doc) {
+    // Use the provided 'doc' reference. Clear it first.
+    doc.clear();
+
+    // --- Add System Instruction (Optional) ---
+    if (systemMessage.length() > 0) {
+        JsonObject systemInstruction = doc.createNestedObject("systemInstruction");
+        JsonArray parts = systemInstruction.createNestedArray("parts");
+        JsonObject textPart = parts.createNestedObject();
+        textPart["text"] = systemMessage;
+    }
+
+    // --- Build Conversation History ---
+    JsonArray contents = doc.createNestedArray("contents");
+
+    // Add user's original message
+    JsonObject userContent = contents.createNestedObject();
+    userContent["role"] = "user";
+    JsonArray userParts = userContent.createNestedArray("parts");
+    JsonObject userTextPart = userParts.createNestedObject();
+    userTextPart["text"] = lastUserMessage;
+
+    // Parse and add the assistant's response with function calls
+    JsonDocument assistantDoc;
+    DeserializationError assistantError = deserializeJson(assistantDoc, lastAssistantToolCallsJson);
+    if (!assistantError) {
+        // Create the assistant message
+        JsonObject assistantContent = contents.createNestedObject();
+        assistantContent["role"] = "model";
+        JsonArray assistantParts = assistantContent.createNestedArray("parts");
+        
+        // Add function calls (ensure we have at least one part)
+        if (assistantDoc.is<JsonArray>()) {
+            JsonArray toolCalls = assistantDoc.as<JsonArray>();
+            
+            for (JsonVariant toolCall : toolCalls) {
+                if (toolCall.containsKey("type") && toolCall["type"] == "function" && 
+                    toolCall.containsKey("function")) {
+                    
+                    JsonObject function = toolCall["function"];
+                    
+                    if (function.containsKey("name") && function.containsKey("arguments")) {
+                        JsonObject functionCallPart = assistantParts.createNestedObject();
+                        JsonObject functionCall = functionCallPart.createNestedObject("functionCall");
+                        
+                        functionCall["name"] = function["name"].as<String>();
+                        
+                        // Parse and add arguments
+                        JsonDocument argsDoc;
+                        DeserializationError argsError = deserializeJson(argsDoc, function["arguments"].as<String>());
+                        if (!argsError) {
+                            functionCall["args"] = argsDoc.as<JsonObject>();
+                        } else {
+                            // If we can't parse as JSON, use as a string
+                            functionCall["args"] = JsonObject();
+                        }
+                    }
+                }
+            }
+            
+            // If no parts were added, add a dummy text part to avoid empty parts array
+            if (assistantParts.size() == 0) {
+                JsonObject textPart = assistantParts.createNestedObject();
+                textPart["text"] = "";
+            }
+        }
+    }
+    
+    // Parse and add the tool results
+    JsonDocument resultsDoc;
+    DeserializationError resultsError = deserializeJson(resultsDoc, toolResultsJson);
+    if (!resultsError && resultsDoc.is<JsonArray>()) {
+        JsonArray results = resultsDoc.as<JsonArray>();
+        
+        for (JsonVariant result : results) {
+            if (result.containsKey("function") && 
+                result["function"].containsKey("name") && 
+                result["function"].containsKey("output")) {
+                
+                // Add function response
+                JsonObject userFunctionContent = contents.createNestedObject();
+                userFunctionContent["role"] = "user";
+                JsonArray userFunctionParts = userFunctionContent.createNestedArray("parts");
+                
+                JsonObject functionResponsePart = userFunctionParts.createNestedObject();
+                JsonObject functionResponse = functionResponsePart.createNestedObject("functionResponse");
+                
+                functionResponse["name"] = result["function"]["name"].as<String>();
+                
+                // Try to parse the output as JSON
+                JsonDocument outputDoc;
+                DeserializationError outputError = deserializeJson(outputDoc, result["function"]["output"].as<String>());
+                if (!outputError) {
+                    JsonObject contentObj = functionResponse.createNestedObject("response");
+                    contentObj["content"] = outputDoc.as<JsonObject>();
+                } else {
+                    // If not valid JSON, use text format
+                    JsonObject contentObj = functionResponse.createNestedObject("response");
+                    contentObj["content"] = result["function"]["output"].as<String>();
+                }
+            }
+        }
+    }
+
+    // --- Add Tools Array for Follow-up ---
+    // Create a single tool object with an array of function declarations
+    JsonArray tools = doc.createNestedArray("tools");
+    JsonObject tool = tools.createNestedObject();
+    JsonArray functionDeclarations = tool.createNestedArray("functionDeclarations");
+    
+    // Process each tool definition in the toolsArray (copy from buildToolCallsRequestBody)
+    for (int i = 0; i < toolsArraySize; i++) {
+        // Parse the tool JSON
+        JsonDocument toolDoc;
+        DeserializationError error = deserializeJson(toolDoc, toolsArray[i]);
+        if (error) {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Error parsing tool JSON: " + String(error.c_str()));
+            Serial.println("Tool JSON: " + toolsArray[i]);
+            #endif
+            continue;
+        }
+        
+        // Extract the function details based on format (simple or nested)
+        String name, description;
+        JsonVariant parameters;
+        
+        if (toolDoc.containsKey("type") && toolDoc.containsKey("function")) {
+            // OpenAI format: {"type":"function", "function":{...}}
+            JsonObject function = toolDoc["function"];
+            
+            if (function.containsKey("name")) {
+                name = function["name"].as<String>();
+            }
+            
+            if (function.containsKey("description")) {
+                description = function["description"].as<String>();
+            }
+            
+            if (function.containsKey("parameters")) {
+                parameters = function["parameters"];
+            }
+        } else {
+            // Simpler format: {"name":"...", "description":"...", "parameters":{...}}
+            if (toolDoc.containsKey("name")) {
+                name = toolDoc["name"].as<String>();
+            }
+            
+            if (toolDoc.containsKey("description")) {
+                description = toolDoc["description"].as<String>();
+            }
+            
+            if (toolDoc.containsKey("parameters")) {
+                parameters = toolDoc["parameters"];
+            }
+        }
+        
+        // Skip if no name was found (required field)
+        if (name.isEmpty()) {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Skipping tool without name");
+            #endif
+            continue;
+        }
+        
+        // Create function declaration object
+        JsonObject functionDeclaration = functionDeclarations.createNestedObject();
+        functionDeclaration["name"] = name;
+        
+        if (description.length() > 0) {
+            functionDeclaration["description"] = description;
+        }
+        
+        if (!parameters.isNull()) {
+            // Convert parameters to Gemini format if needed
+            JsonObject geminiParams = functionDeclaration.createNestedObject("parameters");
+            
+            // Check if we need to convert from OpenAI format to Gemini format
+            if (parameters.containsKey("type") && parameters["type"] == "object") {
+                // OpenAI format uses lowercase types, Gemini uses uppercase
+                geminiParams["type"] = "OBJECT";
+                
+                // Copy properties
+                if (parameters.containsKey("properties")) {
+                    JsonObject srcProps = parameters["properties"];
+                    JsonObject geminiProps = geminiParams.createNestedObject("properties");
+                    
+                    // Copy each property, converting types to uppercase
+                    for (JsonPair kv : srcProps) {
+                        JsonObject srcProp = kv.value().as<JsonObject>();
+                        JsonObject geminiProp = geminiProps.createNestedObject(kv.key().c_str());
+                        
+                        // Convert type to uppercase
+                        if (srcProp.containsKey("type")) {
+                            String type = srcProp["type"].as<String>();
+                            type.toUpperCase(); // Modify the string in place
+                            geminiProp["type"] = type; // Now assign the modified string
+                        }
+                        
+                        // Copy other fields
+                        if (srcProp.containsKey("description")) {
+                            geminiProp["description"] = srcProp["description"];
+                        }
+                        
+                        if (srcProp.containsKey("enum")) {
+                            JsonArray srcEnum = srcProp["enum"];
+                            JsonArray geminiEnum = geminiProp.createNestedArray("enum");
+                            for (JsonVariant enumVal : srcEnum) {
+                                geminiEnum.add(enumVal);
+                            }
+                        }
+                    }
+                }
+                
+                // Copy required array
+                if (parameters.containsKey("required")) {
+                    JsonArray srcRequired = parameters["required"];
+                    JsonArray geminiRequired = geminiParams.createNestedArray("required");
+                    for (JsonVariant req : srcRequired) {
+                        geminiRequired.add(req);
+                    }
+                }
+            } else {
+                // Assume parameters are already in Gemini format, copy directly
+                for (JsonPair kv : parameters.as<JsonObject>()) {
+                    if (kv.value().is<JsonObject>()) {
+                        JsonObject subObj = geminiParams.createNestedObject(kv.key().c_str());
+                        for (JsonPair subKv : kv.value().as<JsonObject>()) {
+                            subObj[subKv.key().c_str()] = subKv.value();
+                        }
+                    } else if (kv.value().is<JsonArray>()) {
+                        JsonArray arr = geminiParams.createNestedArray(kv.key().c_str());
+                        for (JsonVariant item : kv.value().as<JsonArray>()) {
+                            arr.add(item);
+                        }
+                    } else {
+                        geminiParams[kv.key().c_str()] = kv.value();
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Tool Choice (if specified) ---
+    if (toolChoice.length() > 0 && toolChoice != "auto") {
+        JsonDocument toolChoiceDoc;
+        DeserializationError error = deserializeJson(toolChoiceDoc, toolChoice);
+        if (!error) {
+            if (toolChoiceDoc.containsKey("type") && toolChoiceDoc["type"] == "function") {
+                // Add toolChoice configuration
+                JsonObject toolChoiceObj = doc.createNestedObject("toolConfig");
+                toolChoiceObj["toolChoice"] = "any"; // Gemini doesn't support exact function selection like OpenAI
+            }
+        }
+    }
+
+    String requestBody;
+    serializeJson(doc, requestBody);
+    
+    #ifdef ENABLE_DEBUG_OUTPUT
+    Serial.println("Gemini Tool Calls Follow-up Request Body:");
+    Serial.println(requestBody);
+    #endif
+    
+    return requestBody;
+}
+#endif // ENABLE_TOOL_CALLS
+
 #endif // USE_AI_API_GEMINI

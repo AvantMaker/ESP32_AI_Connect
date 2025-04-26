@@ -25,7 +25,7 @@
 
 // --- Advanced Configuration (Optional) ---
 // Adjust JSON buffer sizes if needed (consider ESP32 memory)
-#define AI_API_REQ_JSON_DOC_SIZE 1024
+#define AI_API_REQ_JSON_DOC_SIZE 6000
 #define AI_API_RESP_JSON_DOC_SIZE 2048
 // Default HTTP timeout
 #define AI_API_HTTP_TIMEOUT_MS 30000 // 30 seconds

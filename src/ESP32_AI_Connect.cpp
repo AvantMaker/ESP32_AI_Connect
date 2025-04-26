@@ -178,9 +178,9 @@ bool ESP32_AI_Connect::tcChatSetup(String* tcTools, int tcToolsSize, String tcSy
     }
     
     // --- VALIDATION STEP 3: Validate tool_choice ---
-    if (tcToolChoice != "auto" && tcToolChoice != "none" && 
+    if (tcToolChoice != "auto" && tcToolChoice != "none" && tcToolChoice != "required" && 
         !tcToolChoice.startsWith("{") && !tcToolChoice.startsWith("\"")) {
-        _lastError = "Invalid tool_choice value. Must be 'auto', 'none', or a valid JSON object/string.";
+        _lastError = "Invalid tool_choice value. Must be 'auto', 'none', 'required' , or a valid JSON object/string.";
         return false;
     }
     

@@ -19,6 +19,26 @@ public:
     String parseResponseBody(const String& responsePayload,
                              String& errorMsg, JsonDocument& doc) override;
 
+#ifdef ENABLE_TOOL_CALLS
+    // --- Tool Calls Methods (Override virtual methods from base class) ---
+    String buildToolCallsRequestBody(const String& modelName,
+                               const String* toolsArray, int toolsArraySize,
+                               const String& systemMessage, const String& toolChoice,
+                               const String& userMessage, JsonDocument& doc) override;
+                               
+    String parseToolCallsResponseBody(const String& responsePayload,
+                                String& errorMsg, JsonDocument& doc) override;
+                                
+    // Build a follow-up request body with tool results
+    String buildToolCallsFollowUpRequestBody(const String& modelName,
+                                       const String* toolsArray, int toolsArraySize,
+                                       const String& systemMessage, const String& toolChoice,
+                                       const String& lastUserMessage,
+                                       const String& lastAssistantToolCallsJson,
+                                       const String& toolResultsJson,
+                                       JsonDocument& doc) override;
+#endif
+
     // Add DeepSeek-specific methods here if needed, e.g.:
     // bool setJsonOutput(bool enable);
 private:

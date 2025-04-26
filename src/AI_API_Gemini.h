@@ -21,6 +21,25 @@ public:
 
     int getTotalTokens() const override { return _totalTokens; }
 
+#ifdef ENABLE_TOOL_CALLS
+    // Tool calls methods
+    String buildToolCallsRequestBody(const String& modelName,
+                               const String* toolsArray, int toolsArraySize,
+                               const String& systemMessage, const String& toolChoice,
+                               const String& userMessage, JsonDocument& doc) override;
+                               
+    String parseToolCallsResponseBody(const String& responsePayload,
+                                String& errorMsg, JsonDocument& doc) override;
+                                
+    String buildToolCallsFollowUpRequestBody(const String& modelName,
+                               const String* toolsArray, int toolsArraySize,
+                               const String& systemMessage, const String& toolChoice,
+                               const String& lastUserMessage,
+                               const String& lastAssistantToolCallsJson,
+                               const String& toolResultsJson,
+                               JsonDocument& doc) override;
+#endif
+
     // Add Gemini-specific methods here if needed
 private:
     int _totalTokens = 0;  // Store the total tokens from the last response

@@ -41,14 +41,21 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 ## Supported Platforms
 
 
-| Platform          | Identifier           | Example Models                  | Too Calls Support | Streaming Support |
+| Platform          | Identifier           | Example Models                  | Tool Calls Support | Streaming Support |
 |-------------------|----------------------|---------------------------------|-------------------|-------------------|
 | OpenAI            | `"openai"`           | gpt-3.5-turbo, gpt-4           | Yes               | Under Development               |
-| Google Gemini     | `"gemini"`           | gemini-2.0-flash                | Under Development                | Under Development               |
-| DeepSeek          | `"deepseek"`         | deepseek-chat                   | No               | Under Development                |
-| OpenAI Compatible | `"openai-compatible"`| qwen etc.                       | Yes               | Under Development               |
+| Google Gemini     | `"gemini"`           | gemini-2.0-flash                | Yes                | Under Development               |
+| DeepSeek          | `"deepseek"`         | deepseek-chat                   | Yes               | Under Development                |
+| OpenAI Compatible | `"openai-compatible"`| qwen etc.                       | See Note 1 below               | Under Development               |
 
-**Note: We are working hard to add Anthroic Claude, Grok and Hugging Face to the supported platform.**
+**Note 1:** Support for tool calls varies across platforms and models. Therefore, the availability of the `tool_calls` functionality of the OpenAI Compatible platform depends on the specific platform and model you select.
+
+**Note 2:** We are actively working to add Anthropic Claude, Grok, and Hugging Face to the list of supported platforms.
+
+
+## Dependency
+
+The **ESP32_AI_connect** library depends on the **ArduinoJson** library (version 7.3.1 or higher) to function properly. For more details about the ArduinoJson library, please visit its official website: [https://arduinojson.org/](https://arduinojson.org/)
 
 ## Installation
 
