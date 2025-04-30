@@ -1,17 +1,69 @@
+/*
+ * ESP32_AI_Connect - Custom LLM Chat Example
+ * 
+ * Description:
+ * This example demonstrates how to communicate with an AI platform that supports
+ * OpenAI API standards. In this code, we use HuggingFace as an example to show how
+ * to access an AI platform via a custom API endpoint. Note that the API endpoint
+ * provided is specific to HuggingFace. To connect to your preferred AI platform
+ * compatible with OpenAI API standards, simply replace the HuggingFace endpoint
+ * with the one you wish to use. Additionally, make sure to provide any required
+ * information, such as the API key and model name, as needed. You can configure 
+ * the AI client with custom parameters (system role, temperature, and max tokens),
+ * and interactively send chat messages to the LLM using Serial input, displaying
+ * responses and configuration details on the Serial monitor.
+ * 
+ * Author: AvantMaker <admin@avantmaker.com>
+ * Author Website: https://www.AvantMaker.com
+ * Date: April 30, 2025
+ * Version: 1.0.0
+ * 
+ * Hardware Requirements:
+ * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
+ * 
+ * Dependencies:
+ * - ESP32_AI_Connect library (available at https://github.com/AvantMaker/ESP32_AI_Connect)
+ * - ArduinoJson library (version 7.0.0 or higher, available at https://arduinojson.org/)
+ * 
+ * Setup Instructions:
+ * - Update the sketch with your WiFi credentials (`ssid`, `password`), API key (`apiKey`), model
+ *   (`model`), and custom API endpoint (`customEndpoint`).
+ * - Upload the sketch to your ESP32 board and open the Serial Monitor (115200 baud) to interact with the LLM.
+ * 
+ * License: MIT License (see LICENSE file in the repository for details)
+ * Repository: https://github.com/AvantMaker/ESP32_AI_Connect
+ * 
+ * Usage Notes:
+ * - Adjust `setSystemRole`, `setTemperature`, and `setMaxTokens` in `setup()` to customize LLM behavior.
+ * - Enter messages via the Serial Monitor to interact with the LLM; responses and errors are displayed.
+ * - Verify the custom endpoint URL is correct and accessible for your LLM provider.
+ * 
+ * Compatibility: Tested with ESP32 DevKitC and DOIT ESP32 DevKit boards using Arduino ESP32 core (version 2.0.0 or later).
+ */
+
 #include <WiFi.h>
 #include <ESP32_AI_Connect.h>
 
-// --- Configuration (User modifies this file) ---
-// Make sure desired platforms are uncommented in ESP32_AI_API_config.h
+const char* ssid = "[YOUR-WIFI-SSID]";         // Replace with your Wi-Fi SSID
+const char* password = "[YOUR-WIFI-PASSWORD]"; // Replace with your Wi-Fi password
 
-const char* ssid = "YOUR_WIFI_SSID";          // Replace with your Wi-Fi SSID
-const char* password = "YOUR_PASSWORD_SSID";  // Replace with your Wi-Fi password
-
-// --- AI API Configuration ---
-const char* apiKey = "Your_LLM_API_KEY";    // Replace with your key
-const char* model = "Your_LLM_MODEL";       // Replace with your model
-const char* platform = "openai-compatible"; // Using openai-compatible platform
-const char* customEndpoint = "your_LLM_API_ENDPOINT"; // Replace with your custom endpoint
+/* AI API Configuration:
+ * This example demonstrates how to communicate with an AI platform that supports
+ * OpenAI API standards. In this code, we use HuggingFace as an example to show how
+ * to access an AI platform via a custom API endpoint. Note that the API endpoint
+ * provided is specific to HuggingFace. To connect to your preferred AI platform
+ * compatible with OpenAI API standards, simply replace the HuggingFace endpoint
+ * with the one you wish to use. Additionally, make sure to provide any required
+ * information, such as the API key and model name, as needed. */
+const char* apiKey = "[YOUR-API-KEY]";          // Replace with your key
+const char* model = "qwen/qwq-32b";             // Replace with your model code
+const char* platform = "openai-compatible";     // Using openai-compatible platform
+const char* customEndpoint = "https://router.huggingface.co/novita/v3/openai/chat/completions"; // Replace with your custom endpoint
+/*                             ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ 
+ *   For more detailed information about the supported model codes that can be used with
+ *   this HuggingFace API endpoint above, please visit the following website:
+ *   https://novita.ai/llm-api 
+ */   
 
 // --- Create the API Client Instance ---
 // Using the new constructor with custom endpoint

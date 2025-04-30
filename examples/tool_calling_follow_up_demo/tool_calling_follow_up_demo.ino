@@ -1,3 +1,43 @@
+/*
+ * ESP32_AI_Connect - Follow-Up Tool Calls Demonstration
+ * 
+ * Description:
+ * This example demonstrates the complete tool call cycle using the ESP32_AI_Connect library on an ESP32
+ * microcontroller over a WiFi network. It shows how to establish a WiFi connection, define and execute two
+ * tools (weather lookup and smart home device control) with mock implementations, configure tool calling
+ * parameters (system role, max tokens, tool choice), send an initial tool call request, process results, and
+ * send them back to the AI for a final response. The demo displays configuration, tool call results, and AI
+ * responses on the Serial monitor.
+ * 
+ * Author: AvantMaker <admin@avantmaker.com>
+ * Author Website: https://www.AvantMaker.com
+ * Date: April 30, 2025
+ * Version: 1.0.0
+ * 
+ * Hardware Requirements:
+ * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
+ * 
+ * Dependencies:
+ * - ESP32_AI_Connect library (available at https://github.com/AvantMaker/ESP32_AI_Connect)
+ * - ArduinoJson library (version 7.0.0 or higher, available at https://arduinojson.org/)
+ * 
+ * Setup Instructions:
+ * 1. In `ESP32_AI_Connect_config.h`, set `#define AI_API_REQ_JSON_DOC_SIZE 5120` to support larger tool calls.
+ * 2. Create or update `my_info.h` with your WiFi credentials (`ssid`, `password`), API key (`apiKey`),
+ *    platform (e.g., "openai"), model (e.g., "gpt-3.5-turbo"), and custom endpoint (`customEndpoint`).
+ * 3. Upload the sketch to your ESP32 board and open the Serial Monitor (115200 baud) to view the demo output.
+ * 
+ * License: MIT License (see LICENSE file in the repository for details)
+ * Repository: https://github.com/AvantMaker/ESP32_AI_Connect
+ * 
+ * Usage Notes:
+ * - Modify the `myTools` array or mock functions (`get_weather`, `control_device`) to implement real APIs or devices.
+ * - Advanced users can set `setTCToolChoice` or `setTCReplyToolChoice` with a JSON object to specify a particular tool.
+ * - Check the Serial Monitor for configuration details, tool call results, follow-up responses, and error messages.
+ * - The demo supports multiple AI platforms (e.g., OpenAI, Gemini, Anthropic) with varying finish reasons.
+ * 
+ * Compatibility: Tested with ESP32 DevKitC and DOIT ESP32 DevKit boards using Arduino ESP32 core (version 2.0.0 or later).
+ */
 #include <WiFi.h>
 #include <ESP32_AI_Connect.h>
 #include <ArduinoJson.h> 
@@ -5,13 +45,12 @@
 
 // --- Ensure Features are Enabled in the Library Config ---
 // Make sure the following are uncommented in ESP32_AI_Connect_config.h:
-// #define USE_AI_API_OPENAI
 // #define ENABLE_TOOL_CALLS
 // #define ENABLE_DEBUG_OUTPUT // Optional: To see request/response details
 
 // --- Create the API Client Instance ---
-ESP32_AI_Connect aiClient(platform, apiKey, model);
-// ESP32_AI_Connect aiClient(platform, apiKey, model, customEndpoint);
+// ESP32_AI_Connect aiClient(platform, apiKey, model);
+ESP32_AI_Connect aiClient(platform, apiKey, model, customEndpoint);
 
 // --- Simulated functions that would be called when tools are invoked ---
 String getWeatherData(const String& city, const String& units) {
@@ -200,16 +239,36 @@ void setup() {
   "}";
 
   // --- Setup Tool Calling ---
+
   Serial.println("Setting up tool calling configuration...");
-  if (!aiClient.tcChatSetup(myTools, numTools)) {
+  String myTCSystemMessage = "You can get weather info. and control smart devices based on the input functions.";
+  String myTCToolChoiceMode = "auto"; // default auto, can be none or required
+  if (!aiClient.tcToolSetup(myTools, numTools)) { // Basic tcToolSetup Example
     Serial.println("Failed to set up tool calling!");
     Serial.println("Error: " + aiClient.getLastError());
     while(1) { delay(1000); } // Halt on failure
   }
   Serial.println("Tool calling setup successful.");
 
+  // --- Demonstrate Configuration Methods for initial tool calls request ---
+  aiClient.setTCSystemRole("You are a smart home assistant."); // Optional: Set system role message
+  aiClient.setTCMaxToken(300); // Optional: Set maximum tokens for the response
+  aiClient.setTCToolChoice("auto"); // Optional: Set tool choice mode
+  
+  // ↓ You can also use json string to set tool_choice. Just use the    ↓
+  // ↓ right format as the following and make sure the platform and llm ↓
+  // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓  supports this.  ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓                                                   ↓
+  // aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
+  
+  Serial.println("\n---Initial Tool Call Configuration ---");
+  Serial.println("System Role: " + aiClient.getTCSystemRole());
+  Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
+  Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+
   // --- Initial prompt that will likely require tool calls ---
-  String userMessage = "I want to turn on the living room lights and check the weather in Paris.";
+  // String userMessage = "I want to turn on the living room lights and check the weather in Paris.";
+  String userMessage = "I want to turn down the bedroom light to 20.";
+  // String userMessage = "Check the weather in Paris.";
   runToolCallsDemo(userMessage);
 }
 
@@ -223,6 +282,9 @@ void runToolCallsDemo(String userMessage) {
   String finishReason = aiClient.getFinishReason();
   String lastError = aiClient.getLastError();
 
+  Serial.println("---------- INITIAL REQUEST FINISH REASON ----------");
+  Serial.println(finishReason);
+
   // --- Check for errors ---
   if (!lastError.isEmpty()) {
     Serial.println("Error occurred: " + lastError);
@@ -230,9 +292,15 @@ void runToolCallsDemo(String userMessage) {
   }
 
   // --- STEP 2: Process tool calls if requested ---
-  if (finishReason == "tool_calls") {
-    Serial.println("\n--- TOOL CALLS REQUESTED ---");
-    Serial.println("Tool calls JSON: " + result);
+  // Both OpenAI and Gemini use the keyword "tool_calls" 
+  // as the `finish_reason` to indicate that a tool call was
+  // the reason for finishing. In contrast, Anthropic's Claude
+  // uses the keyword "tool_use" to signify the same finish reason.
+
+  if (finishReason == "tool_calls" || finishReason == "tool_use") {
+    
+    Serial.println("\n--- TOOLS REQUESTED BY LLM---");
+    Serial.println("Tools JSON: " + result);
     
     // Parse the tool calls JSON
     DynamicJsonDocument doc(1536); // Increased size for multiple tool calls
@@ -301,8 +369,26 @@ void runToolCallsDemo(String userMessage) {
     }
     
     // Serialize the tool results to a JSON string
+    // This will be added to the follow-up tool calls request.
     String toolResultsJson;
     serializeJson(toolResults, toolResultsJson);
+
+    // --- Demonstrate Configuration Methods for follow-up tool calls request ---
+    // Config the max_token and tool_choice in the follow-up
+    // request. These parameters are independent of the parameters 
+    // set in the initial request. 
+
+    aiClient.setTCReplyMaxToken(350);
+    aiClient.setTCReplyToolChoice("auto");
+    
+    // ↓ You can also use json string to set tool_choice. Just use the    ↓
+    // ↓ right format as the following and make sure the platform and llm ↓
+    // ↓                          supports this.                          ↓                         ↓
+    // aiClient.setTCReplyToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
+
+    Serial.println("\n---Follow-Up Tool Call Configuration ---");
+    Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxToken()));
+    Serial.println("Follow-Up Tool Choice: " + aiClient.getTCReplyToolChoice());
     
     // --- STEP 3: Send the tool results back to the AI ---
     Serial.println("\n--- SENDING TOOL RESULTS ---");
@@ -312,7 +398,10 @@ void runToolCallsDemo(String userMessage) {
     String followUpResult = aiClient.tcReply(toolResultsJson);
     finishReason = aiClient.getFinishReason();
     lastError = aiClient.getLastError();
-    
+
+    Serial.println("---------- FOLLOW-UP REQUEST FINISH REASON ----------");
+    Serial.println(finishReason);    
+
     if (!lastError.isEmpty()) {
       Serial.println("Error in follow-up: " + lastError);
       return;
@@ -327,7 +416,7 @@ void runToolCallsDemo(String userMessage) {
       Serial.println("AI requested more tool calls: " + followUpResult);
       Serial.println("(This example doesn't handle multiple rounds of tool calls)");
     } 
-    else if (finishReason == "stop") {
+    else if (finishReason == "stop"  || finishReason == "end_turn" ) {
       // Normal response - display it
       Serial.println("Final AI Response: " + followUpResult);
     } 
@@ -336,7 +425,7 @@ void runToolCallsDemo(String userMessage) {
       Serial.println("Raw response: " + followUpResult);
     }
   }
-  else if (finishReason == "stop") {
+  else if (finishReason == "stop"  || finishReason == "end_turn" ) {
     // If AI responded directly without calling tools
     Serial.println("\n--- AI RESPONDED WITHOUT TOOL CALLS ---");
     Serial.println("AI Response: " + result);
@@ -348,10 +437,21 @@ void runToolCallsDemo(String userMessage) {
   }
   
   Serial.println("\n--------------------");
+
+  // Demonstration of rest Tool Calls configuration
+  // Both initial and follow-up configuration will be reset
+  aiClient.tcChatReset();
+
+  // Check Tool Call Configuration after Reset-
+  Serial.println("\n---Tool Call Configuration after Reset---");
+  Serial.println("Initial System Role: " + aiClient.getTCSystemRole());
+  Serial.println("Initial Max Tokens: " + String(aiClient.getTCMaxToken()));
+  Serial.println("Initial Tool Choice: " + aiClient.getTCToolChoice());
+  Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxToken()));
+  Serial.println("Follow-Up Tool Choice: " + aiClient.getTCReplyToolChoice());
   Serial.println("Demo completed");
 }
 
 void loop() {
   // Nothing to do in the loop for this demo
-  delay(10000);
 }
