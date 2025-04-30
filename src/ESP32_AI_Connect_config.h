@@ -21,11 +21,12 @@
 #define USE_AI_API_OPENAI        // Enable OpenAI and OpenAI-compatible APIs
 #define USE_AI_API_GEMINI        // Enable Google Gemini API
 #define USE_AI_API_DEEPSEEK      // Enable DeepSeek API
+#define USE_AI_API_CLAUDE        // Enable Anthropic Claude API
 // Add defines for other platforms here as needed
 
 // --- Advanced Configuration (Optional) ---
 // Adjust JSON buffer sizes if needed (consider ESP32 memory)
-#define AI_API_REQ_JSON_DOC_SIZE 6000
+#define AI_API_REQ_JSON_DOC_SIZE 2048
 #define AI_API_RESP_JSON_DOC_SIZE 2048
 // Default HTTP timeout
 #define AI_API_HTTP_TIMEOUT_MS 30000 // 30 seconds

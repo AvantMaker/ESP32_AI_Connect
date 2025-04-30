@@ -102,14 +102,20 @@ String AI_API_DeepSeek_Handler::parseResponseBody(const String& responsePayload,
 
 #ifdef ENABLE_TOOL_CALLS
 String AI_API_DeepSeek_Handler::buildToolCallsRequestBody(const String& modelName,
-                                                 const String* toolsArray, int toolsArraySize,
-                                                 const String& systemMessage, const String& toolChoice,
-                                                 const String& userMessage, JsonDocument& doc) {
+                                                   const String* toolsArray, int toolsArraySize,
+                                                   const String& systemMessage, const String& toolChoice,
+                                                   int maxTokens,
+                                                   const String& userMessage, JsonDocument& doc) {
     // Clear the document first
     doc.clear();
 
     // Set the model
     doc["model"] = modelName;
+    
+    // Add max_tokens parameter if specified
+    if (maxTokens > 0) {
+        doc["max_tokens"] = maxTokens;
+    }
     
     // Add messages array
     JsonArray messages = doc.createNestedArray("messages");
@@ -125,6 +131,55 @@ String AI_API_DeepSeek_Handler::buildToolCallsRequestBody(const String& modelNam
     JsonObject userMsg = messages.createNestedObject();
     userMsg["role"] = "user";
     userMsg["content"] = userMessage;
+    
+    // Add tool_choice if specified
+    if (toolChoice.length() > 0) {
+        String trimmedChoice = toolChoice;
+        trimmedChoice.trim();
+        
+        // Check if it's one of the allowed string values
+        if (trimmedChoice == "auto" || trimmedChoice == "none" || trimmedChoice == "required") {
+            // Simple string values can be added directly
+            doc["tool_choice"] = trimmedChoice;
+        } 
+        // Check if it starts with { - might be a JSON object string
+        else if (trimmedChoice.startsWith("{")) {
+            // Try to parse it as a JSON object
+            DynamicJsonDocument toolChoiceDoc(512);
+            DeserializationError error = deserializeJson(toolChoiceDoc, trimmedChoice);
+            
+            if (!error) {
+                // Successfully parsed as JSON - add as an object
+                JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                
+                // Copy all fields from the parsed JSON
+                for (JsonPair kv : toolChoiceDoc.as<JsonObject>()) {
+                    if (kv.value().is<JsonObject>()) {
+                        JsonObject subObj = toolChoiceObj.createNestedObject(kv.key().c_str());
+                        JsonObject srcSubObj = kv.value().as<JsonObject>();
+                        
+                        for (JsonPair subKv : srcSubObj) {
+                            subObj[subKv.key().c_str()] = subKv.value();
+                        }
+                    } else {
+                        toolChoiceObj[kv.key().c_str()] = kv.value();
+                    }
+                }
+            } else {
+                // Not valid JSON - add as string but this will likely cause an API error
+                #ifdef ENABLE_DEBUG_OUTPUT
+                Serial.println("Warning: tool_choice value is not valid JSON: " + trimmedChoice);
+                #endif
+                doc["tool_choice"] = trimmedChoice;
+            }
+        } else {
+            // Not a recognized string value or JSON - add as string but will likely cause an API error
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Warning: tool_choice value is not recognized: " + trimmedChoice);
+            #endif
+            doc["tool_choice"] = trimmedChoice;
+        }
+    }
     
     // Add tools array
     JsonArray tools = doc.createNestedArray("tools");
@@ -234,11 +289,6 @@ String AI_API_DeepSeek_Handler::buildToolCallsRequestBody(const String& modelNam
         }
     }
     
-    // Add tool_choice if not "auto"
-    if (toolChoice != "auto") {
-        doc["tool_choice"] = toolChoice;
-    }
-    
     // Serialize the document to a string
     String requestBody;
     serializeJson(doc, requestBody);
@@ -344,12 +394,19 @@ String AI_API_DeepSeek_Handler::buildToolCallsFollowUpRequestBody(const String& 
                                                          const String& lastUserMessage,
                                                          const String& lastAssistantToolCallsJson,
                                                          const String& toolResultsJson,
+                                                         int followUpMaxTokens,
+                                                         const String& followUpToolChoice,
                                                          JsonDocument& doc) {
     // Clear the document first
     doc.clear();
 
     // Set the model
     doc["model"] = modelName;
+    
+    // Add max_tokens parameter if specified for follow-up
+    if (followUpMaxTokens > 0) {
+        doc["max_tokens"] = followUpMaxTokens;
+    }
     
     // Add messages array for the conversation
     JsonArray messages = doc.createNestedArray("messages");
@@ -561,9 +618,53 @@ String AI_API_DeepSeek_Handler::buildToolCallsFollowUpRequestBody(const String& 
         }
     }
     
-    // 6. Add tool_choice if not "auto"
-    if (toolChoice != "auto") {
-        doc["tool_choice"] = toolChoice;
+    // Add tool_choice if specified for follow-up
+    if (followUpToolChoice.length() > 0) {
+        String trimmedChoice = followUpToolChoice;
+        trimmedChoice.trim();
+        
+        // Check if it's one of the allowed string values
+        if (trimmedChoice == "auto" || trimmedChoice == "none" || trimmedChoice == "required") {
+            // Simple string values can be added directly
+            doc["tool_choice"] = trimmedChoice;
+        } 
+        // Check if it starts with { - might be a JSON object string
+        else if (trimmedChoice.startsWith("{")) {
+            // Try to parse it as a JSON object
+            DynamicJsonDocument toolChoiceDoc(512);
+            DeserializationError error = deserializeJson(toolChoiceDoc, trimmedChoice);
+            
+            if (!error) {
+                // Successfully parsed as JSON - add as an object
+                JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                
+                // Copy all fields from the parsed JSON
+                for (JsonPair kv : toolChoiceDoc.as<JsonObject>()) {
+                    if (kv.value().is<JsonObject>()) {
+                        JsonObject subObj = toolChoiceObj.createNestedObject(kv.key().c_str());
+                        JsonObject srcSubObj = kv.value().as<JsonObject>();
+                        
+                        for (JsonPair subKv : srcSubObj) {
+                            subObj[subKv.key().c_str()] = subKv.value();
+                        }
+                    } else {
+                        toolChoiceObj[kv.key().c_str()] = kv.value();
+                    }
+                }
+            } else {
+                // Not valid JSON - add as string but this will likely cause an API error
+                #ifdef ENABLE_DEBUG_OUTPUT
+                Serial.println("Warning: follow-up tool_choice value is not valid JSON: " + trimmedChoice);
+                #endif
+                doc["tool_choice"] = trimmedChoice;
+            }
+        } else {
+            // Not a recognized string value or JSON - add as string but will likely cause an API error
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Warning: follow-up tool_choice value is not recognized: " + trimmedChoice);
+            #endif
+            doc["tool_choice"] = trimmedChoice;
+        }
     }
     
     // Serialize the document to a string

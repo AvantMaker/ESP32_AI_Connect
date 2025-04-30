@@ -69,6 +69,7 @@ public:
     virtual String buildToolCallsRequestBody(const String& modelName,
                                        const String* toolsArray, int toolsArraySize,
                                        const String& systemMessage, const String& toolChoice,
+                                       int maxTokens,
                                        const String& userMessage, JsonDocument& doc) { return ""; }
 
     // Parse the JSON response payload for tool calls
@@ -86,6 +87,8 @@ public:
                                        const String& lastUserMessage,
                                        const String& lastAssistantToolCallsJson,
                                        const String& toolResultsJson,
+                                       int followUpMaxTokens,
+                                       const String& followUpToolChoice,
                                        JsonDocument& doc) { return ""; }
 #endif
 

@@ -27,7 +27,7 @@ ESP32_AI_Connect::~ESP32_AI_Connect() {
     }
     
     // Reset tool calls conversation history
-    tcReset();
+    tcChatReset();
 #endif
 }
 
@@ -72,7 +72,12 @@ bool ESP32_AI_Connect::begin(const char* platformIdentifier, const char* apiKey,
         _platformHandler = new AI_API_DeepSeek_Handler();
     } else
     #endif
-    // Add checks for other platforms here
+
+    #ifdef USE_AI_API_CLAUDE
+    if (platformStr == "claude") {
+        _platformHandler = new AI_API_Claude_Handler();
+    } else
+    #endif
 
     { // Default case if no match found or platform not compiled
         if (_platformHandler == nullptr) { // Only set error if no handler was created
@@ -111,8 +116,56 @@ String ESP32_AI_Connect::getFinishReason() const {
 }
 
 #ifdef ENABLE_TOOL_CALLS
-// --- Tool Calls Setup ---
-bool ESP32_AI_Connect::tcChatSetup(String* tcTools, int tcToolsSize, String tcSystemMessage, String tcToolChoice) {
+// --- Tool Calls Configuration Setters ---
+void ESP32_AI_Connect::setTCSystemRole(const String& systemRole) {
+    _tcSystemRole = systemRole;
+}
+
+void ESP32_AI_Connect::setTCMaxToken(int maxTokens) {
+    if (maxTokens > 0) {
+        _tcMaxToken = maxTokens;
+    }
+}
+
+void ESP32_AI_Connect::setTCToolChoice(const String& toolChoice) {
+    _tcToolChoice = toolChoice;
+}
+
+// --- Tool Calls Configuration Getters ---
+String ESP32_AI_Connect::getTCSystemRole() const {
+    return _tcSystemRole;
+}
+
+int ESP32_AI_Connect::getTCMaxToken() const {
+    return _tcMaxToken;
+}
+
+String ESP32_AI_Connect::getTCToolChoice() const {
+    return _tcToolChoice;
+}
+
+// --- Tool Calls Follow-up Configuration Setters ---
+void ESP32_AI_Connect::setTCReplyMaxToken(int maxTokens) {
+    if (maxTokens > 0) {
+        _tcFollowUpMaxToken = maxTokens;
+    }
+}
+
+void ESP32_AI_Connect::setTCReplyToolChoice(const String& toolChoice) {
+    _tcFollowUpToolChoice = toolChoice;
+}
+
+// --- Tool Calls Follow-up Configuration Getters ---
+int ESP32_AI_Connect::getTCReplyMaxToken() const {
+    return _tcFollowUpMaxToken;
+}
+
+String ESP32_AI_Connect::getTCReplyToolChoice() const {
+    return _tcFollowUpToolChoice;
+}
+
+// --- Tool Setup ---
+bool ESP32_AI_Connect::tcToolSetup(String* tcTools, int tcToolsSize) {
     _lastError = "";
     
     // --- VALIDATION STEP 1: Check total length ---
@@ -122,10 +175,6 @@ bool ESP32_AI_Connect::tcChatSetup(String* tcTools, int tcToolsSize, String tcSy
     for (int i = 0; i < tcToolsSize; i++) {
         totalLength += tcTools[i].length();
     }
-    
-    // Add system message and tool choice lengths
-    totalLength += tcSystemMessage.length();
-    totalLength += tcToolChoice.length();
     
     // Check against maximum allowed size (adjust this value as needed)
     const size_t MAX_TOTAL_TC_LENGTH = AI_API_REQ_JSON_DOC_SIZE / 2; // Use half of request doc size as rough limit
@@ -177,13 +226,6 @@ bool ESP32_AI_Connect::tcChatSetup(String* tcTools, int tcToolsSize, String tcSy
         }
     }
     
-    // --- VALIDATION STEP 3: Validate tool_choice ---
-    if (tcToolChoice != "auto" && tcToolChoice != "none" && tcToolChoice != "required" && 
-        !tcToolChoice.startsWith("{") && !tcToolChoice.startsWith("\"")) {
-        _lastError = "Invalid tool_choice value. Must be 'auto', 'none', 'required' , or a valid JSON object/string.";
-        return false;
-    }
-    
     // --- Clean up previous tools array if exists ---
     if (_tcToolsArray != nullptr) {
         delete[] _tcToolsArray;
@@ -206,11 +248,26 @@ bool ESP32_AI_Connect::tcChatSetup(String* tcTools, int tcToolsSize, String tcSy
         _tcToolsArraySize = tcToolsSize;
     }
     
-    // Store system message and tool choice
-    _tcSystemMessage = tcSystemMessage;
-    _tcToolChoice = tcToolChoice;
-    
     return true;
+}
+
+// --- Reset Tool Calls ---
+void ESP32_AI_Connect::tcChatReset() {
+    _lastUserMessage = "";
+    _lastAssistantToolCallsJson = "";
+    _lastMessageWasToolCalls = false;
+    
+    // Reset but don't delete tool definitions
+    // If users want to clear tools, they need to call tcToolSetup with empty array
+    
+    // Reset configuration to defaults
+    _tcSystemRole = "";
+    _tcMaxToken = -1;
+    _tcToolChoice = "";
+    
+    // Reset follow-up configuration to defaults
+    _tcFollowUpMaxToken = -1;
+    _tcFollowUpToolChoice = "";
 }
 
 // --- Perform Tool Calls Chat ---
@@ -225,7 +282,7 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
     
     // Check if tool calls setup has been performed
     if (_tcToolsArray == nullptr || _tcToolsArraySize == 0) {
-        _lastError = "Tool calls not set up. Call tcChatSetup() first.";
+        _lastError = "Tool calls not set up. Call tcToolSetup() first.";
         return "";
     }
     
@@ -244,7 +301,7 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
     // Build request body using the platform handler's tool calls method
     String requestBody = _platformHandler->buildToolCallsRequestBody(
         _modelName, _tcToolsArray, _tcToolsArraySize, 
-        _tcSystemMessage, _tcToolChoice, tcUserMessage, _reqDoc);
+        _tcSystemRole, _tcToolChoice, _tcMaxToken, tcUserMessage, _reqDoc);
     
     if (requestBody.isEmpty()) {
         if (_lastError.isEmpty()) _lastError = "Failed to build tool calls request body.";
@@ -322,7 +379,7 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
     
     // Check if tool calls setup has been performed
     if (_tcToolsArray == nullptr || _tcToolsArraySize == 0) {
-        _lastError = "Tool calls not set up. Call tcChatSetup() first.";
+        _lastError = "Tool calls not set up. Call tcToolSetup() first.";
         return "";
     }
     
@@ -386,9 +443,9 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
     // Build request body using the platform handler's tool calls follow-up method
     String requestBody = _platformHandler->buildToolCallsFollowUpRequestBody(
         _modelName, _tcToolsArray, _tcToolsArraySize,
-        _tcSystemMessage, _tcToolChoice,
+        _tcSystemRole, _tcToolChoice,
         _lastUserMessage, _lastAssistantToolCallsJson,
-        toolResultsJson, _reqDoc);
+        toolResultsJson, _tcFollowUpMaxToken, _tcFollowUpToolChoice, _reqDoc);
     
     if (requestBody.isEmpty()) {
         if (_lastError.isEmpty()) _lastError = "Failed to build tool calls follow-up request body.";
@@ -455,13 +512,6 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
     }
     
     return ""; // Return empty string on error
-}
-
-// --- Reset Tool Calls Conversation ---
-void ESP32_AI_Connect::tcReset() {
-    _lastUserMessage = "";
-    _lastAssistantToolCallsJson = "";
-    _lastMessageWasToolCalls = false;
 }
 #endif // ENABLE_TOOL_CALLS
 

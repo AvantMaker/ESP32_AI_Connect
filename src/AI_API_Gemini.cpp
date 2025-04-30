@@ -178,6 +178,7 @@ String AI_API_Gemini_Handler::parseResponseBody(const String& responsePayload,
 String AI_API_Gemini_Handler::buildToolCallsRequestBody(const String& modelName,
                         const String* toolsArray, int toolsArraySize,
                         const String& systemMessage, const String& toolChoice,
+                        int maxTokens,
                         const String& userMessage, JsonDocument& doc) {
     // Use the provided 'doc' reference. Clear it first.
     doc.clear();
@@ -188,6 +189,12 @@ String AI_API_Gemini_Handler::buildToolCallsRequestBody(const String& modelName,
         JsonArray parts = systemInstruction.createNestedArray("parts");
         JsonObject textPart = parts.createNestedObject();
         textPart["text"] = systemMessage;
+    }
+
+    // --- Add Generation Config (Optional) for maxTokens ---
+    if (maxTokens > 0) {
+        JsonObject generationConfig = doc.createNestedObject("generationConfig");
+        generationConfig["maxOutputTokens"] = maxTokens;
     }
 
     // --- Add User Content ---
@@ -340,15 +347,51 @@ String AI_API_Gemini_Handler::buildToolCallsRequestBody(const String& modelName,
     }
 
     // --- Tool Choice (if specified) ---
-    if (toolChoice.length() > 0 && toolChoice != "auto") {
-        JsonDocument toolChoiceDoc;
-        DeserializationError error = deserializeJson(toolChoiceDoc, toolChoice);
-        if (!error) {
-            if (toolChoiceDoc.containsKey("type") && toolChoiceDoc["type"] == "function") {
-                // Add toolChoice configuration
-                JsonObject toolChoiceObj = doc.createNestedObject("toolConfig");
-                toolChoiceObj["toolChoice"] = "any"; // Gemini doesn't support exact function selection like OpenAI
+    if (toolChoice.length() > 0) {
+        // For Gemini, the correct structure is:
+        // "tool_config": {
+        //   "function_calling_config": {
+        //     "mode": "ANY" or "AUTO" or "NONE"
+        //   }
+        // }
+        String trimmedChoice = toolChoice;
+        trimmedChoice.trim();
+        
+        // Check if it's a JSON object
+        if (trimmedChoice.startsWith("{")) {
+            // Try to parse it to see if it's valid JSON
+            DynamicJsonDocument toolChoiceDoc(512);
+            DeserializationError error = deserializeJson(toolChoiceDoc, trimmedChoice);
+            
+            if (!error && toolChoiceDoc.containsKey("type") && toolChoiceDoc["type"] == "function") {
+                // Convert OpenAI's function object to Gemini's format
+                JsonObject toolConfig = doc.createNestedObject("tool_config");
+                JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+                functionCallingConfig["mode"] = "ANY";
             }
+        } 
+        // Check for string values - use exact user values, don't map
+        else if (trimmedChoice.equalsIgnoreCase("auto")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            functionCallingConfig["mode"] = "AUTO";
+        } 
+        else if (trimmedChoice.equalsIgnoreCase("none")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            functionCallingConfig["mode"] = "NONE";
+        } 
+        else if (trimmedChoice.equalsIgnoreCase("required") || trimmedChoice.equalsIgnoreCase("any")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            String upperChoice = trimmedChoice;
+            upperChoice.toUpperCase();
+            functionCallingConfig["mode"] = upperChoice;
+        }
+        else {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Warning: unsupported tool_choice value for Gemini: " + trimmedChoice);
+            #endif
         }
     }
 
@@ -486,6 +529,8 @@ String AI_API_Gemini_Handler::buildToolCallsFollowUpRequestBody(const String& mo
                         const String& lastUserMessage,
                         const String& lastAssistantToolCallsJson,
                         const String& toolResultsJson,
+                        int followUpMaxTokens,
+                        const String& followUpToolChoice,
                         JsonDocument& doc) {
     // Use the provided 'doc' reference. Clear it first.
     doc.clear();
@@ -496,6 +541,12 @@ String AI_API_Gemini_Handler::buildToolCallsFollowUpRequestBody(const String& mo
         JsonArray parts = systemInstruction.createNestedArray("parts");
         JsonObject textPart = parts.createNestedObject();
         textPart["text"] = systemMessage;
+    }
+
+    // --- Add Generation Config (Optional) for followUpMaxTokens ---
+    if (followUpMaxTokens > 0) {
+        JsonObject generationConfig = doc.createNestedObject("generationConfig");
+        generationConfig["maxOutputTokens"] = followUpMaxTokens;
     }
 
     // --- Build Conversation History ---
@@ -730,15 +781,89 @@ String AI_API_Gemini_Handler::buildToolCallsFollowUpRequestBody(const String& mo
     }
 
     // --- Tool Choice (if specified) ---
-    if (toolChoice.length() > 0 && toolChoice != "auto") {
-        JsonDocument toolChoiceDoc;
-        DeserializationError error = deserializeJson(toolChoiceDoc, toolChoice);
-        if (!error) {
-            if (toolChoiceDoc.containsKey("type") && toolChoiceDoc["type"] == "function") {
-                // Add toolChoice configuration
-                JsonObject toolChoiceObj = doc.createNestedObject("toolConfig");
-                toolChoiceObj["toolChoice"] = "any"; // Gemini doesn't support exact function selection like OpenAI
+    if (followUpToolChoice.length() > 0) {
+        // For Gemini, the correct structure is:
+        // "tool_config": {
+        //   "function_calling_config": {
+        //     "mode": "ANY" or "AUTO" or "NONE"
+        //   }
+        // }
+        String trimmedChoice = followUpToolChoice;
+        trimmedChoice.trim();
+        
+        // Check if it's a JSON object
+        if (trimmedChoice.startsWith("{")) {
+            // Try to parse it to see if it's valid JSON
+            DynamicJsonDocument toolChoiceDoc(512);
+            DeserializationError error = deserializeJson(toolChoiceDoc, trimmedChoice);
+            
+            if (!error && toolChoiceDoc.containsKey("type") && toolChoiceDoc["type"] == "function") {
+                // Convert OpenAI's function object to Gemini's format
+                JsonObject toolConfig = doc.createNestedObject("tool_config");
+                JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+                functionCallingConfig["mode"] = "ANY";
             }
+        } 
+        // Check for string values - use exact user values, don't map
+        else if (trimmedChoice.equalsIgnoreCase("auto")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            functionCallingConfig["mode"] = "AUTO";
+        } 
+        else if (trimmedChoice.equalsIgnoreCase("none")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            functionCallingConfig["mode"] = "NONE";
+        } 
+        else if (trimmedChoice.equalsIgnoreCase("required") || trimmedChoice.equalsIgnoreCase("any")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            String upperChoice = trimmedChoice;
+            upperChoice.toUpperCase();
+            functionCallingConfig["mode"] = upperChoice;
+        }
+        else {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Warning: unsupported tool_choice value for Gemini: " + trimmedChoice);
+            #endif
+        }
+    } 
+    else if (toolChoice.length() > 0) {
+        // If follow-up tool_choice is not specified but original tool_choice is, use that
+        String trimmedChoice = toolChoice;
+        trimmedChoice.trim();
+        
+        // Check if it's a JSON object
+        if (trimmedChoice.startsWith("{")) {
+            // Try to parse it to see if it's valid JSON
+            DynamicJsonDocument toolChoiceDoc(512);
+            DeserializationError error = deserializeJson(toolChoiceDoc, trimmedChoice);
+            
+            if (!error && toolChoiceDoc.containsKey("type") && toolChoiceDoc["type"] == "function") {
+                // Convert OpenAI's function object to Gemini's format
+                JsonObject toolConfig = doc.createNestedObject("tool_config");
+                JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+                functionCallingConfig["mode"] = "ANY";
+            }
+        } 
+        // Check for string values - use exact user values, don't map
+        else if (trimmedChoice.equalsIgnoreCase("auto")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            functionCallingConfig["mode"] = "AUTO";
+        } 
+        else if (trimmedChoice.equalsIgnoreCase("none")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            functionCallingConfig["mode"] = "NONE";
+        } 
+        else if (trimmedChoice.equalsIgnoreCase("required") || trimmedChoice.equalsIgnoreCase("any")) {
+            JsonObject toolConfig = doc.createNestedObject("tool_config");
+            JsonObject functionCallingConfig = toolConfig.createNestedObject("function_calling_config");
+            // Use the user's exact value, converting to uppercase for Gemini API
+            String upperChoice = trimmedChoice;
+            upperChoice.toUpperCase();
+            functionCallingConfig["mode"] = upperChoice;
         }
     }
 

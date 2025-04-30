@@ -23,6 +23,9 @@
 #ifdef USE_AI_API_DEEPSEEK
 #include "AI_API_DeepSeek.h"
 #endif
+#ifdef USE_AI_API_CLAUDE
+#include "AI_API_Claude.h"
+#endif
 // Add other conditional includes here
 
 class ESP32_AI_Connect {
@@ -62,12 +65,28 @@ public:
 #ifdef ENABLE_TOOL_CALLS
     // --- Tool Calls Methods ---
     
-    // Setup tool calls configuration
+    // Setup tool definitions
     // tcTools: array of JSON strings, each representing a tool definition
     // tcToolsSize: number of elements in the tcTools array
-    // tcSystemMessage: optional system message specifically for tool calls (can be empty)
-    // tcToolChoice: optional tool choice setting ("auto", "none", or specific tool - default "auto") 
-    bool tcChatSetup(String* tcTools, int tcToolsSize, String tcSystemMessage = "", String tcToolChoice = "auto");
+    bool tcToolSetup(String* tcTools, int tcToolsSize);
+    
+    // Tool call configuration setters
+    void setTCSystemRole(const String& systemRole);
+    void setTCMaxToken(int maxTokens);
+    void setTCToolChoice(const String& toolChoice);
+    
+    // Tool call configuration getters
+    String getTCSystemRole() const;
+    int getTCMaxToken() const;
+    String getTCToolChoice() const;
+    
+    // Tool call follow-up request configuration setters
+    void setTCReplyMaxToken(int maxTokens);
+    void setTCReplyToolChoice(const String& toolChoice);
+    
+    // Tool call follow-up request configuration getters
+    int getTCReplyMaxToken() const;
+    String getTCReplyToolChoice() const;
     
     // Perform a chat with tool calls
     // Returns: if finish_reason is "tool_calls", returns the tool_calls JSON array as string
@@ -90,9 +109,9 @@ public:
     // Returns: same as tcChat - tool_calls JSON or content string depending on finish_reason
     String tcReply(const String& toolResultsJson);
     
-    // Reset the tool calls conversation history
+    // Reset the tool calls conversation history and configuration
     // Call this when you want to start a new conversation
-    void tcReset();
+    void tcChatReset();
 #endif
 
     // --- Optional: Access platform-specific features ---
@@ -117,8 +136,13 @@ private:
     // Tool calls configuration storage
     String* _tcToolsArray = nullptr;
     int _tcToolsArraySize = 0;
-    String _tcSystemMessage = "";
-    String _tcToolChoice = "auto";
+    String _tcSystemRole = "";
+    String _tcToolChoice = "";
+    int _tcMaxToken = -1;
+    
+    // Tool calls follow-up configuration storage
+    String _tcFollowUpToolChoice = "";
+    int _tcFollowUpMaxToken = -1;
     
     // Conversation tracking for tool calls follow-up
     String _lastUserMessage = "";         // Original user query
