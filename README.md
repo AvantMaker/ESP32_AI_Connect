@@ -46,7 +46,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 | OpenAI            | `"openai"`           | gpt-3.5-turbo, gpt-4           | Yes               | Under Development               |
 | Google Gemini     | `"gemini"`           | gemini-2.0-flash                | Yes                | Under Development               |
 | DeepSeek          | `"deepseek"`         | deepseek-chat                   | Yes               | Under Development                |
-| OpenAI Compatible | `"openai-compatible"`| qwen etc.                       | See Note 1 below               | Under Development               |
+| OpenAI Compatible | `"openai-compatible"`| HuggingFace, qwen, etc.                       | See Note 1 below               | Under Development               |
 
 **Note 1:** Support for tool calls varies across platforms and models. Therefore, the availability of the `tool_calls` functionality of the OpenAI Compatible platform depends on the specific platform and model you select.
 
@@ -55,7 +55,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 
 ## Dependency
 
-The **ESP32_AI_connect** library depends on the **ArduinoJson** library (version 7.3.1 or higher) to function properly. For more details about the ArduinoJson library, please visit its official website: [https://arduinojson.org/](https://arduinojson.org/)
+The **ESP32_AI_connect** library depends on the **ArduinoJson** library (version 7.0.0 or higher) to function properly. For more details about the ArduinoJson library, please visit its official website: [https://arduinojson.org/](https://arduinojson.org/)
 
 ## Installation
 
