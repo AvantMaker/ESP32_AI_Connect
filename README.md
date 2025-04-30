@@ -19,7 +19,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 - OpenAI
 - Google Gemini
 - DeepSeek
-- OpenAI-Compatible
+- OpenAI-Compatible (HuggingFace, Qwen, etc.)
 - And more to be included...
 
 ## Features
