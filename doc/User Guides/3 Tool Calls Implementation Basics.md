@@ -1,4 +1,4 @@
-# ESP32_AI_Connect Library User Guide - Tool Calls Implementation Basics
+# ESP32_AI_Connect Library User Guide - 3 Tool Calls Implementation Basics
 
 ## Overview
 
@@ -135,12 +135,12 @@ Serial.println(F("Tool calling setup successful."));
 
 The `tcToolSetup` method takes the array of tool definitions and its size. This sets up the basic configuration for tool calling.
 
-## Step 7: Configure Tool Calling Parameters
+## Step 7: Configure Tool Calling Parameters (Optional)
 
-You can customize the tool calling behavior using setter methods:
+You can customize the tool calling behavior using optional setter methods:
 
 ```cpp
-// --- Demonstrate Configuration Methods ---
+// --- Demonstrate Configuration Methods (Optional) ---
 aiClient.setTCSystemRole("You are a weather assistant.");
 aiClient.setTCMaxToken(300);
 aiClient.setTCToolChoice("auto");
@@ -151,15 +151,29 @@ Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
 Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
 ```
 
-These methods allow you to:
+These optional methods allow you to:
 - Set a system role message that defines the AI's behavior (`setTCSystemRole`)
 - Set the maximum number of tokens for the response (`setTCMaxToken`)
-- Set the tool choice parameter (`setTCToolChoice`) which can be:
-  - `"auto"`: Let the AI decide whether to use tools
-  - `"none"`: Don't use tools
-  - A specific tool name to force using a particular tool
+- Set the tool choice parameter (`setTCToolChoice`) which dictates how the AI selects tools
 
 Each setter also has a corresponding getter method to retrieve the current value.
+
+Different AI platforms support different `toolChoice` parameters. The table below shows the allowed values for each platform:
+
+| Tool Choice Mode | OpenAI API | Gemini API | Anthropic Claude API |
+|------------------|------------|------------|----------------------|
+| "auto"           | ✓          | ✓          | ✓                    |
+| "none"           | ✓          | ✓          | ✓                    |
+| "required"       | ✓          | ✗          | ✗                    |
+| "any"            | ✗          | ✓          | ✓                    |
+| Tool Choice JSON | ✓          | ✓          | ✓                    |
+
+Notes on tool choice options:
+- `"auto"`: Let the AI decide whether to use tools (default behavior)
+- `"none"`: Don't use tools
+- `"required"`: (OpenAI only) Forces the model to use a tool
+- `"any"`: (Gemini and Claude only) Model should use a tool if relevant
+- Tool Choice JSON: Specifies a particular tool to use (format varies by platform)
 
 ## Step 8: Send a Message to Trigger Tool Calls
 
@@ -189,7 +203,7 @@ Serial.println("Finish Reason: " + finishReason);
 if (!lastError.isEmpty()) {
   Serial.println("Error occurred:");
   Serial.println(lastError);
-} else if (finishReason == "tool_calls") {
+} else if (finishReason == "tool_calls" || finishReason == "tool_use") {
   Serial.println("Tool call(s) requested:");
   Serial.println(result); // Print the raw JSON array string of tool calls
 
@@ -202,11 +216,21 @@ if (!lastError.isEmpty()) {
 }
 ```
 
-If `finishReason` is `"tool_calls"`, the AI is requesting that you execute one or more functions and return the results.
+If `finishReason` is `"tool_calls"` or `"tool_use"`, the AI is requesting that you execute one or more functions and return the results.
+
+Here's a table that summarizes the different finish reason values used by each platform when tool calls are requested:
+
+| Platform | Finish Reason Value | Notes |
+|----------|---------------------|-------|
+| OpenAI API | `"tool_calls"` | Returned when the model decides to call one or more tools |
+| Gemini API | `"tool_calls"` | Google Gemini's tool_calls finish reason differs from OpenAI and other platforms. To simplify tool_calls handling, ESP32_AI_Connect Library checks the server response and converts the finish reason to "tool_calls". |
+| Anthropic Claude API | `"tool_use"` | Different terminology than OpenAI/Gemini but serves the same function |
+
+This distinction is important when checking the `finishReason` in your code to determine if you need to execute tools based on the AI's response.
 
 ## Step 10: Parse and Execute Tool Calls
 
-When you receive tool calls, you need to parse the JSON response and execute the requested functions:
+When you receive tool calls, you must parse the JSON response and execute the requested functions. A practical example of how to parse and handle tool calls can be found in the tool_calling_demo_2 example code located in the examples folder.
 
 ```cpp
 // Example parsing (requires ArduinoJson):
@@ -253,7 +277,7 @@ The `tcChatReset()` method resets all tool call parameters to their default valu
 
 ## Advanced: Using Multiple Tools
 
-You can define multiple tools by increasing the size of your tools array:
+You can define multiple tools by expanding the size of your tools array. For a practical example of handling multiple tools during tool calling operations with the ESP32_AI_Connect Library, refer to the tool_calling_demo_2 example code in the examples folder.
 
 ```cpp
 const int numTools = 2;

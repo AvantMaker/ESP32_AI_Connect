@@ -10,8 +10,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: April 30, 2025
- * Version: 1.0.0
+ * Date: May 2, 2025
+ * Version: 1.0.1
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -95,9 +95,9 @@ void setup() {
   Serial.println(F("Tool calling setup successful."));
 
   // --- Demonstrate Configuration Methods ---
-  aiClient.setTCSystemRole("You are a weather assistant.");
-  aiClient.setTCMaxToken(300);
-  aiClient.setTCToolChoice("auto");
+  aiClient.setTCSystemRole("You are a weather assistant.");// Optional: Set system role message
+  aiClient.setTCMaxToken(300);        // Optional: Set maximum tokens for the response
+  aiClient.setTCToolChoice("auto");   // Optional: Set tool choice mode. 
 
   Serial.println("\n--- Tool Call Configuration ---");
   Serial.println("System Role: " + aiClient.getTCSystemRole());
@@ -119,7 +119,7 @@ void setup() {
   if (!lastError.isEmpty()) {
     Serial.println("Error occurred:");
     Serial.println(lastError);
-  } else if (finishReason == "tool_calls") {
+  } else if (finishReason == "tool_calls" || finishReason == "tool_use") {
     Serial.println("Tool call(s) requested:");
     Serial.println(result); // Print the raw JSON array string of tool calls
 

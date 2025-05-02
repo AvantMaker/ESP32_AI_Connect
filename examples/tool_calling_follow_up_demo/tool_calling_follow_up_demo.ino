@@ -11,8 +11,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: April 30, 2025
- * Version: 1.0.0
+ * Date: May 2, 2025
+ * Version: 1.0.1
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -49,8 +49,8 @@
 // #define ENABLE_DEBUG_OUTPUT // Optional: To see request/response details
 
 // --- Create the API Client Instance ---
-// ESP32_AI_Connect aiClient(platform, apiKey, model);
-ESP32_AI_Connect aiClient(platform, apiKey, model, customEndpoint);
+ESP32_AI_Connect aiClient(platform, apiKey, model);
+// ESP32_AI_Connect aiClient(platform, apiKey, model, customEndpoint);
 
 // --- Simulated functions that would be called when tools are invoked ---
 String getWeatherData(const String& city, const String& units) {
@@ -242,7 +242,6 @@ void setup() {
 
   Serial.println("Setting up tool calling configuration...");
   String myTCSystemMessage = "You can get weather info. and control smart devices based on the input functions.";
-  String myTCToolChoiceMode = "auto"; // default auto, can be none or required
   if (!aiClient.tcToolSetup(myTools, numTools)) { // Basic tcToolSetup Example
     Serial.println("Failed to set up tool calling!");
     Serial.println("Error: " + aiClient.getLastError());
@@ -251,14 +250,14 @@ void setup() {
   Serial.println("Tool calling setup successful.");
 
   // --- Demonstrate Configuration Methods for initial tool calls request ---
-  aiClient.setTCSystemRole("You are a smart home assistant."); // Optional: Set system role message
-  aiClient.setTCMaxToken(300); // Optional: Set maximum tokens for the response
-  aiClient.setTCToolChoice("auto"); // Optional: Set tool choice mode
-  
+  aiClient.setTCSystemRole("You can get weather info. and control smart devices based on the input functions."); // Optional: Set system role message
+  aiClient.setTCMaxToken(365);      // Optional: Set maximum tokens for the response
+  aiClient.setTCToolChoice("auto"); // Optional: Set tool choice mode.
   // ↓ You can also use json string to set tool_choice. Just use the    ↓
   // ↓ right format as the following and make sure the platform and llm ↓
-  // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓  supports this.  ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓                                                   ↓
-  // aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
+  // ↓ supports this.↓                                                  ↓
+  // aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})"); // <- OpenAI/Gemini Supports this format
+  // aiClient.setTCToolChoice(R"({"type": "tool", "name": "control_device"})"); // <- Claude Supports this format
   
   Serial.println("\n---Initial Tool Call Configuration ---");
   Serial.println("System Role: " + aiClient.getTCSystemRole());
@@ -266,9 +265,8 @@ void setup() {
   Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
 
   // --- Initial prompt that will likely require tool calls ---
-  // String userMessage = "I want to turn on the living room lights and check the weather in Paris.";
-  String userMessage = "I want to turn down the bedroom light to 20.";
-  // String userMessage = "Check the weather in Paris.";
+  String userMessage = "I want to turn on the living room lights.";
+  // String userMessage = "Check the weather in Paris."; // Test prompt to use the other tool
   runToolCallsDemo(userMessage);
 }
 
@@ -378,14 +376,9 @@ void runToolCallsDemo(String userMessage) {
     // request. These parameters are independent of the parameters 
     // set in the initial request. 
 
-    aiClient.setTCReplyMaxToken(350);
+    aiClient.setTCReplyMaxToken(900);
     aiClient.setTCReplyToolChoice("auto");
     
-    // ↓ You can also use json string to set tool_choice. Just use the    ↓
-    // ↓ right format as the following and make sure the platform and llm ↓
-    // ↓                          supports this.                          ↓                         ↓
-    // aiClient.setTCReplyToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
-
     Serial.println("\n---Follow-Up Tool Call Configuration ---");
     Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxToken()));
     Serial.println("Follow-Up Tool Choice: " + aiClient.getTCReplyToolChoice());

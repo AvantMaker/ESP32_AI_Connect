@@ -11,8 +11,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: April 30, 2025
- * Version: 1.0.0
+ * Date: May 2, 2025
+ * Version: 1.0.1
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -113,12 +113,15 @@ void setup() {
   Serial.println(F("Tool calling setup successful."));
 
   // --- Demonstrate Configuration Methods ---
-  aiClient.setTCSystemRole("You are a smart home assistant.");
-  aiClient.setTCMaxToken(300);
-  aiClient.setTCToolChoice("auto");
-  // ↓ You can also set the tool choice as a JSON object as the following:
-  // aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
-  
+  aiClient.setTCSystemRole("You are a smart home assistant."); // Optional: Set system role message
+  aiClient.setTCMaxToken(300);       // Optional: Set maximum tokens for the response
+  aiClient.setTCToolChoice("auto");  // Optional: Set tool choice mode.
+   // ↓ You can also use json string to set tool_choice. Just use the    ↓
+   // ↓ right format as the following and make sure the platform and llm ↓
+   // ↓ supports this.↓                                                  ↓
+   // aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})"); // <- OpenAI/Gemini Supports this format
+   // aiClient.setTCToolChoice(R"({"type": "tool", "name": "control_device"})"); // <- Claude Supports this format
+   
 
   Serial.println("\n--- Tool Call Configuration ---");
   Serial.println("System Role: " + aiClient.getTCSystemRole());
@@ -126,7 +129,7 @@ void setup() {
   Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
 
   // --- Perform Tool Calling Chat ---
-  String userMessage = "Turn on the living room lights.";
+  String userMessage = "What is the weather like in New York?";
   Serial.println("\nSending message for tool call: \"" + userMessage + "\"");
   Serial.println("Please wait...");
 
@@ -140,9 +143,41 @@ void setup() {
   if (!lastError.isEmpty()) {
     Serial.println("Error occurred:");
     Serial.println(lastError);
-  } else if (finishReason == "tool_calls") {
+  } else if (finishReason == "tool_calls" || finishReason == "tool_use") {
     Serial.println("Tool call(s) requested:");
     Serial.println(result); // Print the raw JSON array string of tool calls
+
+    // --- Parse the tool calls (optional) ---
+    DynamicJsonDocument doc(1536); // Increased size for multiple tool calls
+    DeserializationError error = deserializeJson(doc, result);
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+    } else {
+      JsonArray toolCalls = doc.as<JsonArray>();
+      Serial.println("\nDetected " + String(toolCalls.size()) + " tool call(s):");
+      
+      for(JsonObject toolCall : toolCalls) {
+        const char* toolCallId = toolCall["id"];
+        const char* functionName = toolCall["function"]["name"];
+        const char* functionArgsStr = toolCall["function"]["arguments"]; // Arguments are often a stringified JSON
+
+        Serial.println("\n-- Parsed Tool Call --");
+        Serial.println("ID: " + String(toolCallId));
+        Serial.println("Function Name: " + String(functionName));
+        Serial.println("Arguments String: " + String(functionArgsStr));
+
+        // Here you would implement the actual function execution depending on functionName
+        if (String(functionName) == "get_weather") {
+          Serial.println("  -> Would get weather information here");
+          // Parse functionArgsStr to extract city, etc.
+        } 
+        else if (String(functionName) == "control_device") {
+          Serial.println("  -> Would control device here");
+          // Parse functionArgsStr to extract device_type, device_id, action, etc.
+        }
+      }
+    }    
 
   } else if (finishReason == "stop") {
     Serial.println("AI text response:");
