@@ -102,10 +102,10 @@ String AI_API_DeepSeek_Handler::parseResponseBody(const String& responsePayload,
 
 #ifdef ENABLE_TOOL_CALLS
 String AI_API_DeepSeek_Handler::buildToolCallsRequestBody(const String& modelName,
-                                                   const String* toolsArray, int toolsArraySize,
-                                                   const String& systemMessage, const String& toolChoice,
+                                                 const String* toolsArray, int toolsArraySize,
+                                                 const String& systemMessage, const String& toolChoice,
                                                    int maxTokens,
-                                                   const String& userMessage, JsonDocument& doc) {
+                                                 const String& userMessage, JsonDocument& doc) {
     // Clear the document first
     doc.clear();
 

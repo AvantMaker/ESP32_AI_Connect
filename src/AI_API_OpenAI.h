@@ -22,10 +22,10 @@ public:
 #ifdef ENABLE_TOOL_CALLS
     // --- Tool Calls Methods (Override virtual methods from base class) ---
     virtual String buildToolCallsRequestBody(const String& modelName,
-                                       const String* toolsArray, int toolsArraySize,
-                                       const String& systemMessage, const String& toolChoice,
+                               const String* toolsArray, int toolsArraySize,
+                               const String& systemMessage, const String& toolChoice,
                                        int maxTokens,
-                                       const String& userMessage, JsonDocument& doc) override;
+                               const String& userMessage, JsonDocument& doc) override;
                                
     String parseToolCallsResponseBody(const String& responsePayload,
                                 String& errorMsg, JsonDocument& doc) override;

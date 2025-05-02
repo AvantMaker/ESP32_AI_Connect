@@ -101,13 +101,8 @@ String AI_API_Claude_Handler::parseResponseBody(const String& responsePayload,
                 
                 // Extract stop reason if available
                 if (doc.containsKey("stop_reason")) {
+                    // Return the exact stop_reason value without mapping
                     _lastFinishReason = doc["stop_reason"].as<String>();
-                    // Map Claude's "stop_sequence" or "max_tokens" to equivalent finish reasons
-                    if (_lastFinishReason == "stop_sequence") {
-                        _lastFinishReason = "stop";
-                    } else if (_lastFinishReason == "max_tokens") {
-                        _lastFinishReason = "length";
-                    }
                 }
                 
                 // Extract token count if available
@@ -146,10 +141,11 @@ String AI_API_Claude_Handler::buildToolCallsRequestBody(const String& modelName,
         // Set the model
         doc["model"] = modelName;
         
-        // Add max_tokens parameter (required for tool calls)
-        doc["max_tokens"] = maxTokens;
+        // Add max_tokens parameter (required for Claude's tool calls API)
+        // Use default value of 1024 if not provided
+        doc["max_tokens"] = (maxTokens > 0) ? maxTokens : 1024;
         
-        // Add system message if specified
+        // Add system message if specified (only if user has set it with setTCSystemRole)
         if (systemMessage.length() > 0) {
             doc["system"] = systemMessage;
         }
@@ -164,7 +160,9 @@ String AI_API_Claude_Handler::buildToolCallsRequestBody(const String& modelName,
             DeserializationError error = deserializeJson(toolDoc, toolsArray[i]);
             
             if (error) {
-                // Handle parsing error
+                #ifdef ENABLE_DEBUG_OUTPUT
+                Serial.println("Error parsing tool JSON: " + String(error.c_str()));
+                #endif
                 return "";
             }
             
@@ -221,9 +219,56 @@ String AI_API_Claude_Handler::buildToolCallsRequestBody(const String& modelName,
         userMsg["role"] = "user";
         userMsg["content"] = userMessage;
         
-        // Add tool_choice if specified
+        // Add tool_choice if specified by user with setTCToolChoice
         if (toolChoice.length() > 0) {
-            doc["tool_choice"] = toolChoice;
+            String trimmedChoice = toolChoice;
+            trimmedChoice.trim();
+            
+            // Check if it's one of the allowed string values
+            if (trimmedChoice == "auto" || trimmedChoice == "any" || trimmedChoice == "none") {
+                // For Claude, use object format with type field
+                JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                toolChoiceObj["type"] = trimmedChoice;
+            } 
+            // Check if it starts with { - might be a JSON object string
+            else if (trimmedChoice.startsWith("{")) {
+                // Try to parse it as a JSON object
+                DynamicJsonDocument toolChoiceDoc(512);
+                DeserializationError error = deserializeJson(toolChoiceDoc, trimmedChoice);
+                
+                if (!error) {
+                    // Successfully parsed as JSON - add as an object
+                    JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                    
+                    // Copy all fields from the parsed JSON
+                    for (JsonPair kv : toolChoiceDoc.as<JsonObject>()) {
+                        if (kv.value().is<JsonObject>()) {
+                            JsonObject subObj = toolChoiceObj.createNestedObject(kv.key().c_str());
+                            JsonObject srcSubObj = kv.value().as<JsonObject>();
+                            
+                            for (JsonPair subKv : srcSubObj) {
+                                subObj[subKv.key().c_str()] = subKv.value();
+                            }
+                        } else {
+                            toolChoiceObj[kv.key().c_str()] = kv.value();
+                        }
+                    }
+                } else {
+                    // Not valid JSON - add as object with type field but this will likely cause an API error
+                    #ifdef ENABLE_DEBUG_OUTPUT
+                    Serial.println("Warning: tool_choice value is not valid JSON: " + trimmedChoice);
+                    #endif
+                    JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                    toolChoiceObj["type"] = trimmedChoice;
+                }
+            } else {
+                // Not a recognized string value or JSON - add as object with type field but will likely cause an API error
+                #ifdef ENABLE_DEBUG_OUTPUT
+                Serial.println("Warning: tool_choice value is not recognized: " + trimmedChoice);
+                #endif
+                JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                toolChoiceObj["type"] = trimmedChoice;
+            }
         }
         
         // Serialize the request body
@@ -232,13 +277,16 @@ String AI_API_Claude_Handler::buildToolCallsRequestBody(const String& modelName,
         return requestBody;
     } 
     catch (const std::exception& e) {
+        #ifdef ENABLE_DEBUG_OUTPUT
+        Serial.println("Exception in buildToolCallsRequestBody: " + String(e.what()));
+        #endif
         return "";
     }
 }
 
 // Parse tool calls response body from Claude API
 String AI_API_Claude_Handler::parseToolCallsResponseBody(const String& responsePayload,
-                                                      String& errorMsg, JsonDocument& doc) {
+                                                    String& errorMsg, JsonDocument& doc) {
     resetState();  // Reset finish reason and token count
     
     try {
@@ -259,87 +307,82 @@ String AI_API_Claude_Handler::parseToolCallsResponseBody(const String& responseP
             return "";
         }
         
-        // Extract the stop reason
-        if (doc.containsKey("stop_reason")) {
-            String stopReason = doc["stop_reason"].as<String>();
-            
-            // Convert Claude's stop_reason to the library's standard finish_reason format
-            if (stopReason == "tool_use") {
-                _lastFinishReason = "tool_calls";  // Map to library's standard format
-            } else if (stopReason == "stop_sequence") {
-                _lastFinishReason = "stop";
-            } else if (stopReason == "max_tokens") {
-                _lastFinishReason = "length";
-            } else {
-                _lastFinishReason = stopReason;
-            }
-        }
-        
         // Extract token count if available
         if (doc.containsKey("usage")) {
             _lastTotalTokens = doc["usage"]["input_tokens"].as<int>() + 
                               doc["usage"]["output_tokens"].as<int>();
         }
         
-        // Check if content array exists
+        // Extract the stop_reason (finish reason) without mapping
+        if (doc.containsKey("stop_reason")) {
+            _lastFinishReason = doc["stop_reason"].as<String>();
+        }
+        
+        // Check if the response contains content
         if (!doc.containsKey("content") || !doc["content"].is<JsonArray>()) {
-            errorMsg = "No valid content array in response";
+            errorMsg = "No content array found in response";
             return "";
         }
         
         JsonArray contentArray = doc["content"];
         
-        // If this is a tool_use response (finish_reason == "tool_calls")
-        if (_lastFinishReason == "tool_calls") {
-            // Create a response in the library's standard tool calls format
+        // Check if there are any tool_use blocks in the content
+        bool hasToolUse = false;
+        for (JsonObject contentBlock : contentArray) {
+            if (contentBlock["type"] == "tool_use") {
+                hasToolUse = true;
+                break;
+            }
+        }
+        
+        // If there are tool_use blocks, extract them into a JSON array
+        if (hasToolUse) {
+            // Create a new document to hold the tool calls array
             DynamicJsonDocument toolCallsDoc(2048);
             JsonArray toolCalls = toolCallsDoc.to<JsonArray>();
             
-            // Extract tool use blocks from content array
+            // Extract each tool_use block
             for (JsonObject contentBlock : contentArray) {
                 if (contentBlock["type"] == "tool_use") {
-                    // Create a new tool call object in the standardized format
+                    // Create a new tool call object in OpenAI-compatible format
                     JsonObject toolCall = toolCalls.createNestedObject();
                     
-                    // Store Claude's tool_use ID for later matching
-                    toolCall["id"] = contentBlock["id"].as<String>();
+                    // Set the ID
+                    toolCall["id"] = contentBlock["id"];
                     
-                    // Create nested function object
+                    // Set the type to "function"
+                    toolCall["type"] = "function";
+                    
+                    // Create the function object
                     JsonObject function = toolCall.createNestedObject("function");
-                    function["name"] = contentBlock["name"].as<String>();
+                    function["name"] = contentBlock["name"];
                     
-                    // Store input as arguments string (serialized JSON)
-                    if (contentBlock.containsKey("input")) {
+                    // Convert input object to arguments string
+                    if (contentBlock.containsKey("input") && contentBlock["input"].is<JsonObject>()) {
                         String argsStr;
-                        JsonObject inputObj = contentBlock["input"];
-                        
-                        // Serialize the input object to a string
-                        DynamicJsonDocument tempDoc(1024);
-                        JsonObject tempObj = tempDoc.to<JsonObject>();
-                        
-                        // Copy all fields from input to temp object
-                        for (JsonPair kv : inputObj) {
-                            tempObj[kv.key()] = kv.value();
-                        }
-                        
-                        serializeJson(tempDoc, argsStr);
+                        serializeJson(contentBlock["input"], argsStr);
                         function["arguments"] = argsStr;
                     } else {
-                        function["arguments"] = "{}";  // Empty JSON object if no input
+                        function["arguments"] = "{}";
                     }
                 }
             }
             
-            // Serialize the tool calls array to a string and return it
-            String result;
-            serializeJson(toolCalls, result);
-            return result;
+            // Serialize the tool calls array to a string
+            String toolCallsJson;
+            serializeJson(toolCalls, toolCallsJson);
+            
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Tool calls detected: " + toolCallsJson);
+            #endif
+            
+            return toolCallsJson;
         } 
-        // Otherwise this is a regular text response
+        // If no tool_use blocks, extract the text content
         else {
             String responseText = "";
             
-            // Extract text from content blocks
+            // Iterate through content blocks
             for (JsonObject contentBlock : contentArray) {
                 if (contentBlock["type"] == "text") {
                     responseText += contentBlock["text"].as<String>();
@@ -351,6 +394,11 @@ String AI_API_Claude_Handler::parseToolCallsResponseBody(const String& responseP
     } 
     catch (const std::exception& e) {
         errorMsg = "Exception during response parsing: " + String(e.what());
+        
+        #ifdef ENABLE_DEBUG_OUTPUT
+        Serial.println("Exception in parseToolCallsResponseBody: " + String(e.what()));
+        #endif
+        
         return "";
     }
 }
@@ -374,10 +422,11 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
         // Set the model
         doc["model"] = modelName;
         
-        // Add max_tokens parameter (required for tool calls)
-        doc["max_tokens"] = 1024; // Default value for Claude
+        // Add max_tokens parameter (required for Claude's tool calls API)
+        // Use default value of 1024 if not provided
+        doc["max_tokens"] = (followUpMaxTokens > 0) ? followUpMaxTokens : 1024;
         
-        // Add system message if specified
+        // Add system message if specified (only if user has set it with setTCSystemRole)
         if (systemMessage.length() > 0) {
             doc["system"] = systemMessage;
         }
@@ -392,7 +441,9 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
             DeserializationError error = deserializeJson(toolDoc, toolsArray[i]);
             
             if (error) {
-                // Handle parsing error
+                #ifdef ENABLE_DEBUG_OUTPUT
+                Serial.println("Error parsing tool JSON in follow-up: " + String(error.c_str()));
+                #endif
                 return "";
             }
             
@@ -456,6 +507,9 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
         DeserializationError assistantError = deserializeJson(assistantResponseDoc, lastAssistantToolCallsJson);
         
         if (assistantError) {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Error parsing assistant tool calls: " + String(assistantError.c_str()));
+            #endif
             return ""; // Error parsing assistant's tool calls
         }
         
@@ -502,11 +556,15 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
                     for (JsonPair kv : argsDoc.as<JsonObject>()) {
                         inputObj[kv.key()] = kv.value();
                     }
+                } else {
+                    #ifdef ENABLE_DEBUG_OUTPUT
+                    Serial.println("Error parsing tool arguments: " + String(argsError.c_str()));
+                    #endif
                 }
             }
         }
         
-        // Add user's tool result message
+        // Add user's tool result message according to Claude's format
         JsonObject toolResultMsg = messages.createNestedObject();
         toolResultMsg["role"] = "user";
         
@@ -518,31 +576,126 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
         DeserializationError resultsError = deserializeJson(resultsDoc, toolResultsJson);
         
         if (resultsError) {
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.println("Error parsing tool results: " + String(resultsError.c_str()));
+            #endif
             return ""; // Error parsing tool results
         }
         
-        // Process each tool result
-        for (JsonObject result : resultsDoc.as<JsonArray>()) {
+        // Process each tool result following Claude's format
+        JsonArray resultsArray = resultsDoc.as<JsonArray>();
+        for (JsonObject result : resultsArray) {
             // Create tool_result content block
             JsonObject toolResultBlock = toolResultContent.createNestedObject();
             toolResultBlock["type"] = "tool_result";
-            toolResultBlock["tool_use_id"] = result["tool_call_id"].as<String>();
             
-            // Handle function output
+            // Set the tool_use_id from tool_call_id
+            if (result.containsKey("tool_call_id")) {
+                toolResultBlock["tool_use_id"] = result["tool_call_id"].as<String>();
+            } else {
+                #ifdef ENABLE_DEBUG_OUTPUT
+                Serial.println("Warning: tool_call_id missing in tool result");
+                #endif
+                continue; // Skip this result if no tool_call_id
+            }
+            
+            // Handle function output - for Claude we need to send the content directly
             if (result.containsKey("function") && result["function"].containsKey("output")) {
                 String output = result["function"]["output"].as<String>();
                 
-                // Set content directly (without trying to parse as JSON)
-                toolResultBlock["content"] = output;
+                // Check if output is a JSON string by looking for { at the beginning
+                if (output.startsWith("{")) {
+                    // Try to parse as JSON to see if it's valid
+                    DynamicJsonDocument outputDoc(1024);
+                    DeserializationError outputError = deserializeJson(outputDoc, output);
+                    
+                    if (!outputError) {
+                        // It's valid JSON, directly assign as content
+                        toolResultBlock["content"] = output;
+                    } else {
+                        // Not valid JSON, just use as plain text
+                        toolResultBlock["content"] = output;
+                    }
+                } else {
+                    // Plain text output
+                    toolResultBlock["content"] = output;
+                }
+            }
+            
+            // Add is_error flag if present
+            if (result.containsKey("is_error") && result["is_error"].as<bool>()) {
+                toolResultBlock["is_error"] = true;
+            }
+        }
+        
+        // Add tool_choice if specified for the follow-up by user with setTCReplyToolChoice
+        if (followUpToolChoice.length() > 0) {
+            String trimmedChoice = followUpToolChoice;
+            trimmedChoice.trim();
+            
+            // Check if it's one of the allowed string values
+            if (trimmedChoice == "auto" || trimmedChoice == "any" || trimmedChoice == "none") {
+                // For Claude, use object format with type field
+                JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                toolChoiceObj["type"] = trimmedChoice;
+            } 
+            // Check if it starts with { - might be a JSON object string
+            else if (trimmedChoice.startsWith("{")) {
+                // Try to parse it as a JSON object
+                DynamicJsonDocument toolChoiceDoc(512);
+                DeserializationError error = deserializeJson(toolChoiceDoc, trimmedChoice);
+                
+                if (!error) {
+                    // Successfully parsed as JSON - add as an object
+                    JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                    
+                    // Copy all fields from the parsed JSON
+                    for (JsonPair kv : toolChoiceDoc.as<JsonObject>()) {
+                        if (kv.value().is<JsonObject>()) {
+                            JsonObject subObj = toolChoiceObj.createNestedObject(kv.key().c_str());
+                            JsonObject srcSubObj = kv.value().as<JsonObject>();
+                            
+                            for (JsonPair subKv : srcSubObj) {
+                                subObj[subKv.key().c_str()] = subKv.value();
+                            }
+                        } else {
+                            toolChoiceObj[kv.key().c_str()] = kv.value();
+                        }
+                    }
+                } else {
+                    // Not valid JSON - add as object with type field but this will likely cause an API error
+                    #ifdef ENABLE_DEBUG_OUTPUT
+                    Serial.println("Warning: tool_choice value is not valid JSON: " + trimmedChoice);
+                    #endif
+                    JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                    toolChoiceObj["type"] = trimmedChoice;
+                }
+            } else {
+                // Not a recognized string value or JSON - add as object with type field but will likely cause an API error
+                #ifdef ENABLE_DEBUG_OUTPUT
+                Serial.println("Warning: tool_choice value is not recognized: " + trimmedChoice);
+                #endif
+                JsonObject toolChoiceObj = doc.createNestedObject("tool_choice");
+                toolChoiceObj["type"] = trimmedChoice;
             }
         }
         
         // Serialize the request body
         String requestBody;
         serializeJson(doc, requestBody);
+        
+        #ifdef ENABLE_DEBUG_OUTPUT
+        Serial.println("---------- Claude Tool Calls Follow-up Request ----------");
+        Serial.println(requestBody);
+        Serial.println("----------------------------------------------------------");
+        #endif
+        
         return requestBody;
     } 
     catch (const std::exception& e) {
+        #ifdef ENABLE_DEBUG_OUTPUT
+        Serial.println("Exception in buildToolCallsFollowUpRequestBody: " + String(e.what()));
+        #endif
         return "";
     }
 }

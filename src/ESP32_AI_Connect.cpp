@@ -343,7 +343,7 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
                 } else {
                     // Track finish reason for potential follow-up
                     String finishReason = _platformHandler->getFinishReason();
-                    if (finishReason == "tool_calls") {
+                    if (finishReason == "tool_calls" || finishReason == "tool_use") {
                         _lastMessageWasToolCalls = true;
                         _lastAssistantToolCallsJson = responseContent;
                     } else {
@@ -487,7 +487,7 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
                 } else {
                     // Track finish reason for potential further follow-up
                     String finishReason = _platformHandler->getFinishReason();
-                    if (finishReason == "tool_calls") {
+                    if (finishReason == "tool_calls" || finishReason == "tool_use") {
                         // If the response requests more tool calls, update tracking
                         _lastMessageWasToolCalls = true;
                         _lastAssistantToolCallsJson = responseContent;
