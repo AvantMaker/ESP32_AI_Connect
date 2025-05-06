@@ -11,7 +11,7 @@ Visit us at [AvantMaker.com](https://www.avantmaker.com) where we've crafted a c
 
 ---
 
-![AvantMaker ESP32_AI_Connect Connects Your ESP32 with AI!](https://avantmaker.com/wp-content/uploads/2025/04/ESP32_AI_Connect_project_feature_image.jpg)
+![AvantMaker ESP32_AI_Connect Connects Your ESP32 with AI!](https://avantmaker.com/wp-content/uploads/2025/05/ESP_32_AI_Connect_Feature_Image_Small.jpg)
 
 ## Overview
 
@@ -51,7 +51,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 
 **Note 1:** Support for tool calls varies across platforms and models. Therefore, the availability of the `tool_calls` functionality of the OpenAI Compatible platform depends on the specific platform and model you select.
 
-**Note 2:** We are actively working to add Grok to the list of supported platforms.
+**Note 2:** We are actively working to add Grok and Ollama to the list of supported platforms.
 
 
 ## Dependency
