@@ -10,8 +10,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 2, 2025
- * Version: 1.0.1
+ * Date: May 9, 2025
+ * Version: 1.0.2
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -87,7 +87,7 @@ void setup() {
 
   // --- Setup Tool Calling ---
   Serial.println("Setting up tool calling configuration...");
-  if (!aiClient.tcToolSetup(myTools, numTools)) {
+  if (!aiClient.setTCTools(myTools, numTools)) {
     Serial.println(F("Failed to set up tool calling!"));
     Serial.println("Error: " + aiClient.getLastError());
     while(1) { delay(1000); } // Halt on failure
@@ -95,14 +95,14 @@ void setup() {
   Serial.println(F("Tool calling setup successful."));
 
   // --- Demonstrate Configuration Methods ---
-  aiClient.setTCSystemRole("You are a weather assistant.");// Optional: Set system role message
-  aiClient.setTCMaxToken(300);        // Optional: Set maximum tokens for the response
-  aiClient.setTCToolChoice("auto");   // Optional: Set tool choice mode. 
+  aiClient.setTCChatSystemRole("You are a weather assistant.");// Optional: Set system role message
+  aiClient.setTCChatMaxTokens(300);        // Optional: Set maximum tokens for the response
+  aiClient.setTCChatToolChoice("auto");   // Optional: Set tool choice mode. 
 
   Serial.println("\n--- Tool Call Configuration ---");
-  Serial.println("System Role: " + aiClient.getTCSystemRole());
-  Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
-  Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+  Serial.println("System Role: " + aiClient.getTCChatSystemRole());
+  Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+  Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
 
   // --- Perform Tool Calling Chat ---
   String userMessage = "What is the weather like in New York?";
@@ -136,9 +136,9 @@ void setup() {
   aiClient.tcChatReset();
 
   Serial.println("\n--- Tool Call Configuration After Reset ---");
-  Serial.println("System Role: " + aiClient.getTCSystemRole());
-  Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
-  Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+  Serial.println("System Role: " + aiClient.getTCChatSystemRole());
+  Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+  Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
 
   Serial.println("\n--------------------");
   Serial.println("Demo finished. Restart device to run again.");

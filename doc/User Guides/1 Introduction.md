@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 1 Introduction
-
+> **Version 0.0.2** • Revised: May 09, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Overview
 
 ESP32_AI_Connect is a powerful, flexible library designed to connect ESP32 microcontrollers to various Large Language Model (LLM) platforms. This library simplifies the process of integrating AI capabilities into your ESP32 projects, allowing you to create intelligent IoT devices, smart assistants, and interactive applications with minimal effort.
@@ -129,3 +129,8 @@ Each guide will include detailed explanations, code examples, and best practices
 If you encounter any issues or have suggestions for improvements, please open an issue on the GitHub repository. Contributions are welcome through pull requests.
 
 Happy building with ESP32 and AI!
+
+---
+>🚀 **Explore our GitHub** for more projects:  
+>- [ESP32_AI_Connect GitHub Repo](https://github.com/AvantMaker/ESP32_AI_Connect)  
+>- [AvantMaker GitHub](https://github.com/AvantMaker/)

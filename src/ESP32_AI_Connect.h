@@ -45,13 +45,31 @@ public:
     // New begin method with custom endpoint
     bool begin(const char* platformIdentifier, const char* apiKey, const char* modelName, const char* endpointUrl);
 
-    // Configuration methods (passed to the handler during request building)
-    void setSystemRole(const char* systemRole);
-    void setTemperature(float temperature);
-    void setMaxTokens(int maxTokens);
+    // Configuration methods for standard chat requests
+    // Sets the System Role for a standard chat request to define the system's behavior in the conversation.
+    void setChatSystemRole(const char* systemRole);
+    // Configures the Temperature parameter of a standard chat request to control the randomness of generated responses.
+    void setChatTemperature(float temperature);
+    // Defines the maximum number of tokens for a standard chat request to limit the length of generated responses.
+    void setChatMaxTokens(int maxTokens);
+    
+    // Getter methods for standard chat request configuration
+    // Returns the current System Role set for standard chat requests.
+    String getChatSystemRole() const;
+    // Returns the current Temperature value set for standard chat requests.
+    float getChatTemperature() const;
+    // Returns the current Maximum Tokens value set for standard chat requests.
+    int getChatMaxTokens() const;
 
     // Main chat function - delegates to the handler
     String chat(const String& userMessage);
+    
+    // Raw response access methods
+    String getChatRawResponse() const;
+    String getTCRawResponse() const;
+    
+    // Reset methods
+    void chatReset();
 
     // Get last error message
     String getLastError() const;
@@ -68,24 +86,34 @@ public:
     // Setup tool definitions
     // tcTools: array of JSON strings, each representing a tool definition
     // tcToolsSize: number of elements in the tcTools array
-    bool tcToolSetup(String* tcTools, int tcToolsSize);
+    bool setTCTools(String* tcTools, int tcToolsSize);
     
     // Tool call configuration setters
-    void setTCSystemRole(const String& systemRole);
-    void setTCMaxToken(int maxTokens);
-    void setTCToolChoice(const String& toolChoice);
+    // Sets the System Role for initial tool calls to define the AI's behavior in tool calling conversations
+    void setTCChatSystemRole(const String& systemRole);
+    // Defines the maximum number of tokens for initial tool calling requests to limit response length
+    void setTCChatMaxTokens(int maxTokens);
+    // Sets the initial tool choice parameter to control how the AI decides which tools to use
+    void setTCChatToolChoice(const String& toolChoice);
     
     // Tool call configuration getters
-    String getTCSystemRole() const;
-    int getTCMaxToken() const;
-    String getTCToolChoice() const;
+    // Returns the current System Role set for initial tool calling requests
+    String getTCChatSystemRole() const;
+    // Returns the current Maximum Tokens value set for tool calling requests
+    int getTCChatMaxTokens() const;
+    // Returns the current Tool Choice setting for tool calling requests
+    String getTCChatToolChoice() const;
     
     // Tool call follow-up request configuration setters
-    void setTCReplyMaxToken(int maxTokens);
+    // Sets the maximum number of tokens for tool call follow-up responses
+    void setTCReplyMaxTokens(int maxTokens);
+    // Sets the tool choice parameter for follow-up requests to control how the AI selects tools in responses
     void setTCReplyToolChoice(const String& toolChoice);
     
     // Tool call follow-up request configuration getters
-    int getTCReplyMaxToken() const;
+    // Returns the maximum tokens setting for tool call follow-up responses
+    int getTCReplyMaxTokens() const;
+    // Returns the tool choice parameter setting for follow-up requests
     String getTCReplyToolChoice() const;
     
     // Perform a chat with tool calls
@@ -131,6 +159,10 @@ private:
     String _customEndpoint = "";  // New member for custom endpoint
     float _temperature = -1.0; // Use API default
     int _maxTokens = -1;       // Use API default
+    
+    // Raw response storage
+    String _chatRawResponse = "";    // Store the raw response from chat method
+    String _tcRawResponse = "";      // Store the raw response from last tool calling method (tcChat or tcReply)
 
 #ifdef ENABLE_TOOL_CALLS
     // Tool calls configuration storage

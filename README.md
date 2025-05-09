@@ -113,9 +113,17 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   // Configure AI client parameters:
-  ai.setTemperature(0.7);       // Set response creativity (0.0-2.0)
-  ai.setMaxTokens(200);         // Limit response length (in tokens)
-  ai.setSystemRole("You are a helpful assistant");  // Set assistant behavior
+  ai.setChatTemperature(0.7);       // Set response creativity (0.0-2.0)
+  ai.setChatMaxTokens(200);         // Limit response length (in tokens)
+  ai.setChatSystemRole("You are a helpful assistant");  // Set assistant behavior
+  
+  // You can retrieve current settings using getter methods:
+  Serial.print("Current temperature: ");
+  Serial.println(ai.getChatTemperature());
+  Serial.print("Maximum tokens: ");
+  Serial.println(ai.getChatMaxTokens());
+  Serial.print("System role: ");
+  Serial.println(ai.getChatSystemRole());
 
   // Send a test message to the AI and get response
   Serial.println("\nSending message to AI...");

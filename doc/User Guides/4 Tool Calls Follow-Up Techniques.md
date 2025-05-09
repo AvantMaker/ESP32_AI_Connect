@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 4 Tool Calls Follow-Up Techniques
-
+> **Version 0.0.2** • Revised: May 09, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Introduction
 
 This article is a follow-up to the previous guide "Tool Calls Implementation Basics". If you haven't read that article yet, please do so before continuing, as this guide builds upon the concepts introduced there.
@@ -33,31 +33,31 @@ Before sending a message to the AI that may trigger tool calls, you need to set 
 
 ```cpp
 // Basic tool setup
-if (!aiClient.tcToolSetup(myTools, numTools)) {
+if (!aiClient.setTCTools(myTools, numTools)) {
   Serial.println("Failed to set up tool calling!");
   Serial.println("Error: " + aiClient.getLastError());
   while(1) { delay(1000); } // Halt on failure
 }
 
 // Optional: Set system role message
-aiClient.setTCSystemRole("You are a smart home assistant.");
+aiClient.setTCChatSystemRole("You are a smart home assistant.");
 
 // Optional: Set maximum tokens for the response
-aiClient.setTCMaxToken(300);
+aiClient.setTCChatMaxTokens(300);
 
 // Optional: Set tool choice mode (auto, none, or required)
-aiClient.setTCToolChoice("auto");
+aiClient.setTCChatToolChoice("auto");
 
 // You can also use a JSON string to specify a particular tool
-// aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
+// aiClient.setTCChatToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
 ```
 
 These configuration settings affect how the AI responds to the initial request. You can check the current settings using the corresponding getter methods:
 
 ```cpp
-String systemRole = aiClient.getTCSystemRole();
-int maxTokens = aiClient.getTCMaxToken();
-String toolChoice = aiClient.getTCToolChoice();
+String systemRole = aiClient.getTCChatSystemRole();
+int maxTokens = aiClient.getTCChatMaxTokens();
+String toolChoice = aiClient.getTCChatToolChoice();
 ```
 
 ## Step 1: Preparing the Tool Results
@@ -172,9 +172,10 @@ serializeJson(toolResults, toolResultsJson);
 Before sending the results back to the AI, you can configure the follow-up request with separate parameters:
 
 ```cpp
-// Configure follow-up request parameters (optional)
-aiClient.setTCReplyMaxToken(350);
-aiClient.setTCReplyToolChoice("auto");
+// Additional follow-up configuration
+// These only affect the follow-up request, not the initial tool call
+aiClient.setTCReplyMaxTokens(350);   // Maximum tokens for the follow-up response
+aiClient.setTCReplyToolChoice("auto"); // Tool choice for the follow-up (can be different from initial)
 
 // You can also use a JSON string to specify a particular tool
 // aiClient.setTCReplyToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
@@ -183,7 +184,7 @@ aiClient.setTCReplyToolChoice("auto");
 These settings apply only to the follow-up request and are independent of the initial request parameters. You can check the current follow-up settings using:
 
 ```cpp
-int replyMaxTokens = aiClient.getTCReplyMaxToken();
+int replyMaxTokens = aiClient.getTCReplyMaxTokens();
 String replyToolChoice = aiClient.getTCReplyToolChoice();
 ```
 
@@ -240,10 +241,10 @@ After completing a tool call cycle, you may want to reset all tool-related setti
 aiClient.tcChatReset();
 
 // Verify reset worked
-Serial.println("System Role after reset: " + aiClient.getTCSystemRole());
-Serial.println("Max Tokens after reset: " + String(aiClient.getTCMaxToken()));
-Serial.println("Tool Choice after reset: " + aiClient.getTCToolChoice());
-Serial.println("Reply Max Tokens after reset: " + String(aiClient.getTCReplyMaxToken()));
+Serial.println("System Role after reset: " + aiClient.getTCChatSystemRole());
+Serial.println("Max Tokens after reset: " + String(aiClient.getTCChatMaxTokens()));
+Serial.println("Tool Choice after reset: " + aiClient.getTCChatToolChoice());
+Serial.println("Reply Max Tokens after reset: " + String(aiClient.getTCReplyMaxTokens()));
 Serial.println("Reply Tool Choice after reset: " + aiClient.getTCReplyToolChoice());
 ```
 
@@ -259,16 +260,16 @@ Let's walk through the complete flow of a tool call interaction using the exampl
    // ... define tool JSON schemas ...
    
    // Set up tool calling
-   if (!aiClient.tcToolSetup(myTools, numTools)) {
+   if (!aiClient.setTCTools(myTools, numTools)) {
      Serial.println("Failed to set up tool calling!");
      Serial.println("Error: " + aiClient.getLastError());
      while(1) { delay(1000); } // Halt on failure
    }
    
    // Configure tool calling parameters
-   aiClient.setTCSystemRole("You are a smart home assistant.");
-   aiClient.setTCMaxToken(300);
-   aiClient.setTCToolChoice("auto");
+   aiClient.setTCChatSystemRole("You are a smart home assistant.");
+   aiClient.setTCChatMaxTokens(300);
+   aiClient.setTCChatToolChoice("auto");
    ```
 
 2. **Initial Request**: Send a user message that will likely trigger a tool call
@@ -294,7 +295,7 @@ Let's walk through the complete flow of a tool call interaction using the exampl
 
 5. **Configure Follow-Up Request**: Set parameters for the follow-up request
    ```cpp
-   aiClient.setTCReplyMaxToken(350);
+   aiClient.setTCReplyMaxTokens(350);
    aiClient.setTCReplyToolChoice("auto");
    ```
 
@@ -446,8 +447,13 @@ Tool calls follow-up is a critical part of the function calling process with LLM
 
 The ESP32_AI_Connect library makes this process straightforward by handling the complex API interactions and maintaining conversation context. With the techniques described in this article, you can build sophisticated applications that leverage the power of LLMs to control hardware, process sensor data, and interact with users in natural language.
 
-The library's configuration methods (`setTCSystemRole`, `setTCMaxToken`, `setTCToolChoice`, `setTCReplyMaxToken`, `setTCReplyToolChoice`) give you fine-grained control over how the AI processes your requests and tool calls, allowing you to optimize for your specific use case.
+The library's configuration methods (`setTCChatSystemRole`, `setTCChatMaxTokens`, `setTCChatToolChoice`, `setTCReplyMaxTokens`, `setTCReplyToolChoice`) give you control over how the AI processes your requests and tool calls, allowing you to optimize for your specific use case.
 
 Remember to always handle errors gracefully, manage memory carefully, and ensure your tool results are formatted correctly to get the best results from your AI-powered ESP32 projects.
 
 Happy building with ESP32 and AI!
+
+---
+>🚀 **Explore our GitHub** for more projects:  
+>- [ESP32_AI_Connect GitHub Repo](https://github.com/AvantMaker/ESP32_AI_Connect)  
+>- [AvantMaker GitHub](https://github.com/AvantMaker/)

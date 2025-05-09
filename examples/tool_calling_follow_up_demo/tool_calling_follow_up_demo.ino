@@ -11,8 +11,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 2, 2025
- * Version: 1.0.1
+ * Date: May 9, 2025
+ * Version: 1.0.5
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -32,7 +32,7 @@
  * 
  * Usage Notes:
  * - Modify the `myTools` array or mock functions (`get_weather`, `control_device`) to implement real APIs or devices.
- * - Advanced users can set `setTCToolChoice` or `setTCReplyToolChoice` with a JSON object to specify a particular tool.
+ * - Advanced users can set `setTCChatToolChoice` or `setTCReplyToolChoice` with a JSON object to specify a particular tool.
  * - Check the Serial Monitor for configuration details, tool call results, follow-up responses, and error messages.
  * - The demo supports multiple AI platforms (e.g., OpenAI, Gemini, Anthropic) with varying finish reasons.
  * 
@@ -142,7 +142,7 @@ void setup() {
              Define two tools: weather and device control
   ----------------------------Attention------------------------------
   The default maximum size for Tool calls is 512 bytes. If you exceed
-  this limit without adjusting the configuration, you’ll encounter
+  this limit without adjusting the configuration, you'll encounter
   an error. To increase the maximum Tool call size, follow these steps:
 
   1. Navigate to the library folder and open the configuration file
@@ -242,7 +242,7 @@ void setup() {
 
   Serial.println("Setting up tool calling configuration...");
   String myTCSystemMessage = "You can get weather info. and control smart devices based on the input functions.";
-  if (!aiClient.tcToolSetup(myTools, numTools)) { // Basic tcToolSetup Example
+  if (!aiClient.setTCTools(myTools, numTools)) { // Basic setTCTools Example
     Serial.println("Failed to set up tool calling!");
     Serial.println("Error: " + aiClient.getLastError());
     while(1) { delay(1000); } // Halt on failure
@@ -250,19 +250,19 @@ void setup() {
   Serial.println("Tool calling setup successful.");
 
   // --- Demonstrate Configuration Methods for initial tool calls request ---
-  aiClient.setTCSystemRole("You can get weather info. and control smart devices based on the input functions."); // Optional: Set system role message
-  aiClient.setTCMaxToken(365);      // Optional: Set maximum tokens for the response
-  aiClient.setTCToolChoice("auto"); // Optional: Set tool choice mode.
+  aiClient.setTCChatSystemRole("You can get weather info. and control smart devices based on the input functions."); // Optional: Set system role message
+  aiClient.setTCChatMaxTokens(365);      // Optional: Set maximum tokens for the response
+  aiClient.setTCChatToolChoice("auto"); // Optional: Set tool choice mode.
   // ↓ You can also use json string to set tool_choice. Just use the    ↓
   // ↓ right format as the following and make sure the platform and llm ↓
   // ↓ supports this.↓                                                  ↓
-  // aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})"); // <- OpenAI/Gemini Supports this format
-  // aiClient.setTCToolChoice(R"({"type": "tool", "name": "control_device"})"); // <- Claude Supports this format
+  // aiClient.setTCChatToolChoice(R"({"type": "function","function": {"name": "control_device"}})"); // <- OpenAI/Gemini Supports this format
+  // aiClient.setTCChatToolChoice(R"({"type": "tool", "name": "control_device"})"); // <- Claude Supports this format
   
   Serial.println("\n---Initial Tool Call Configuration ---");
-  Serial.println("System Role: " + aiClient.getTCSystemRole());
-  Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
-  Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+  Serial.println("System Role: " + aiClient.getTCChatSystemRole());
+  Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+  Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
 
   // --- Initial prompt that will likely require tool calls ---
   String userMessage = "I want to turn on the living room lights.";
@@ -279,9 +279,13 @@ void runToolCallsDemo(String userMessage) {
   String result = aiClient.tcChat(userMessage);
   String finishReason = aiClient.getFinishReason();
   String lastError = aiClient.getLastError();
+  String tcRawResponse = aiClient.getTCRawResponse();
 
   Serial.println("---------- INITIAL REQUEST FINISH REASON ----------");
   Serial.println(finishReason);
+
+  Serial.println("---------- INITIAL REQUEST AI Raw Response:  ----------");
+  Serial.println("AI Raw Response: " + tcRawResponse);
 
   // --- Check for errors ---
   if (!lastError.isEmpty()) {
@@ -376,11 +380,11 @@ void runToolCallsDemo(String userMessage) {
     // request. These parameters are independent of the parameters 
     // set in the initial request. 
 
-    aiClient.setTCReplyMaxToken(900);
+    aiClient.setTCReplyMaxTokens(900);
     aiClient.setTCReplyToolChoice("auto");
     
     Serial.println("\n---Follow-Up Tool Call Configuration ---");
-    Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxToken()));
+    Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxTokens()));
     Serial.println("Follow-Up Tool Choice: " + aiClient.getTCReplyToolChoice());
     
     // --- STEP 3: Send the tool results back to the AI ---
@@ -391,9 +395,13 @@ void runToolCallsDemo(String userMessage) {
     String followUpResult = aiClient.tcReply(toolResultsJson);
     finishReason = aiClient.getFinishReason();
     lastError = aiClient.getLastError();
+    tcRawResponse = aiClient.getTCRawResponse();
 
     Serial.println("---------- FOLLOW-UP REQUEST FINISH REASON ----------");
     Serial.println(finishReason);    
+
+    Serial.println("---------- FOLLOW-UP REQUEST AI Raw Response:  ----------");
+    Serial.println("AI Raw Response: " + tcRawResponse);
 
     if (!lastError.isEmpty()) {
       Serial.println("Error in follow-up: " + lastError);
@@ -437,11 +445,12 @@ void runToolCallsDemo(String userMessage) {
 
   // Check Tool Call Configuration after Reset-
   Serial.println("\n---Tool Call Configuration after Reset---");
-  Serial.println("Initial System Role: " + aiClient.getTCSystemRole());
-  Serial.println("Initial Max Tokens: " + String(aiClient.getTCMaxToken()));
-  Serial.println("Initial Tool Choice: " + aiClient.getTCToolChoice());
-  Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxToken()));
+  Serial.println("Initial System Role: " + aiClient.getTCChatSystemRole());
+  Serial.println("Initial Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+  Serial.println("Initial Tool Choice: " + aiClient.getTCChatToolChoice());
+  Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxTokens()));
   Serial.println("Follow-Up Tool Choice: " + aiClient.getTCReplyToolChoice());
+  Serial.println("Tool-Calling Raw Response: " + aiClient.getTCRawResponse());
   Serial.println("Demo completed");
 }
 

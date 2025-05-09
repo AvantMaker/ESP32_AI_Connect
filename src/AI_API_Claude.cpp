@@ -42,7 +42,7 @@ String AI_API_Claude_Handler::buildRequestBody(const String& modelName, const St
             doc["max_tokens"] = maxTokens;
         }
         
-        // Add system message if specified
+        // Add system message if specified (only if user has set it with setTCChatSystemRole)
         if (systemRole.length() > 0) {
             doc["system"] = systemRole;
         }
@@ -145,7 +145,7 @@ String AI_API_Claude_Handler::buildToolCallsRequestBody(const String& modelName,
         // Use default value of 1024 if not provided
         doc["max_tokens"] = (maxTokens > 0) ? maxTokens : 1024;
         
-        // Add system message if specified (only if user has set it with setTCSystemRole)
+        // Add system message if specified (only if user has set it with setTCChatSystemRole)
         if (systemMessage.length() > 0) {
             doc["system"] = systemMessage;
         }
@@ -219,7 +219,7 @@ String AI_API_Claude_Handler::buildToolCallsRequestBody(const String& modelName,
         userMsg["role"] = "user";
         userMsg["content"] = userMessage;
         
-        // Add tool_choice if specified by user with setTCToolChoice
+        // Add tool_choice if specified by user with setTCChatToolChoice
         if (toolChoice.length() > 0) {
             String trimmedChoice = toolChoice;
             trimmedChoice.trim();
@@ -426,7 +426,7 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
         // Use default value of 1024 if not provided
         doc["max_tokens"] = (followUpMaxTokens > 0) ? followUpMaxTokens : 1024;
         
-        // Add system message if specified (only if user has set it with setTCSystemRole)
+        // Add system message if specified (only if user has set it with setTCChatSystemRole)
         if (systemMessage.length() > 0) {
             doc["system"] = systemMessage;
         }

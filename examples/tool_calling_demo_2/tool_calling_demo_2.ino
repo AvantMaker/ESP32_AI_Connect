@@ -11,8 +11,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 2, 2025
- * Version: 1.0.1
+ * Date: May 9, 2025
+ * Version: 1.0.3
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -48,6 +48,7 @@
 
 // --- Create the API Client Instance ---
 ESP32_AI_Connect aiClient(platform, apiKey, model);
+// ESP32_AI_Connect aiClient(platform, apiKey, model, customEndpoint);
 
 void setup() {
   Serial.begin(115200);
@@ -105,7 +106,7 @@ void setup() {
 
   // --- Setup Tool Calling ---
   Serial.println("Setting up tool calling configuration...");
-  if (!aiClient.tcToolSetup(myTools, numTools)) {
+  if (!aiClient.setTCTools(myTools, numTools)) {
     Serial.println(F("Failed to set up tool calling!"));
     Serial.println("Error: " + aiClient.getLastError());
     while (1) { delay(1000); } // Halt on failure
@@ -113,20 +114,20 @@ void setup() {
   Serial.println(F("Tool calling setup successful."));
 
   // --- Demonstrate Configuration Methods ---
-  aiClient.setTCSystemRole("You are a smart home assistant."); // Optional: Set system role message
-  aiClient.setTCMaxToken(300);       // Optional: Set maximum tokens for the response
-  aiClient.setTCToolChoice("auto");  // Optional: Set tool choice mode.
+  aiClient.setTCChatSystemRole("You are a smart home assistant."); // Optional: Set system role message
+  aiClient.setTCChatMaxTokens(300);       // Optional: Set maximum tokens for the response
+  aiClient.setTCChatToolChoice("auto");  // Optional: Set tool choice mode.
    // ↓ You can also use json string to set tool_choice. Just use the    ↓
    // ↓ right format as the following and make sure the platform and llm ↓
    // ↓ supports this.↓                                                  ↓
-   // aiClient.setTCToolChoice(R"({"type": "function","function": {"name": "control_device"}})"); // <- OpenAI/Gemini Supports this format
-   // aiClient.setTCToolChoice(R"({"type": "tool", "name": "control_device"})"); // <- Claude Supports this format
+   // aiClient.setTCChatToolChoice(R"({"type": "function","function": {"name": "control_device"}})"); // <- OpenAI/Gemini Supports this format
+   // aiClient.setTCChatToolChoice(R"({"type": "tool", "name": "control_device"})"); // <- Claude Supports this format
    
 
   Serial.println("\n--- Tool Call Configuration ---");
-  Serial.println("System Role: " + aiClient.getTCSystemRole());
-  Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
-  Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+  Serial.println("System Role: " + aiClient.getTCChatSystemRole());
+  Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+  Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
 
   // --- Perform Tool Calling Chat ---
   String userMessage = "What is the weather like in New York?";
@@ -144,7 +145,11 @@ void setup() {
     Serial.println("Error occurred:");
     Serial.println(lastError);
   } else if (finishReason == "tool_calls" || finishReason == "tool_use") {
-    Serial.println("Tool call(s) requested:");
+
+    Serial.println("--- Tool call(s) Raw Response ---");
+    Serial.println(aiClient.getTCRawResponse());
+
+    Serial.println("--- Tool call(s) requested ---");
     Serial.println(result); // Print the raw JSON array string of tool calls
 
     // --- Parse the tool calls (optional) ---
@@ -192,9 +197,10 @@ void setup() {
   aiClient.tcChatReset();
 
   Serial.println("\n--- Tool Call Configuration After Reset ---");
-  Serial.println("System Role: " + aiClient.getTCSystemRole());
-  Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
-  Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+  Serial.println("System Role: " + aiClient.getTCChatSystemRole());
+  Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+  Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
+  Serial.println("Tool Choice: " + aiClient.getTCRawResponse());
 
   Serial.println("\n--------------------");
   Serial.println("Demo finished. Restart device to run again.");

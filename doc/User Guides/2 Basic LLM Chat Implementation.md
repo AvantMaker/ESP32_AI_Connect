@@ -1,4 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 2 Basic LLM Chat Implementation
+> **Version 0.0.2** • Revised: May 09, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 
 ## Overview
 
@@ -92,18 +93,38 @@ After establishing the WiFi connection, we configure the AI client with specific
 
 ```cpp:basic_example.ino
   // Configure AI client parameters:
-  ai.setTemperature(0.7);       // Set response creativity (0.0-2.0)
-  ai.setMaxTokens(200);         // Limit response length (in tokens)
-  ai.setSystemRole("You are a helpful assistant");  // Set assistant behavior
+  ai.setChatTemperature(0.7);       // Set response creativity (0.0-2.0)
+  ai.setChatMaxTokens(200);         // Limit response length (in tokens)
+  ai.setChatSystemRole("You are a helpful assistant");  // Set assistant behavior
 ```
 
 These configuration options allow you to customize the behavior of the AI:
 
-- `setTemperature(0.7)`: Controls the randomness/creativity of the responses. Lower values (closer to 0) make responses more deterministic and focused, while higher values (up to 2.0) make them more creative and diverse.
-- `setMaxTokens(200)`: Limits the maximum length of the AI's response in tokens (roughly 4 characters per token). This helps control response size and API costs.
-- `setSystemRole("You are a helpful assistant")`: Sets the system message that defines the AI's behavior and personality.
+- `setChatTemperature(0.7)`: Controls the randomness/creativity of the responses. Lower values (closer to 0) make responses more deterministic and focused, while higher values (up to 2.0) make them more creative and diverse.
+- `setChatMaxTokens(200)`: Limits the maximum length of the AI's response in tokens (roughly 4 characters per token). This helps control response size and API costs.
+- `setChatSystemRole("You are a helpful assistant")`: Sets the system message that defines the AI's behavior and personality.
 
-## Step 6: Send a Message and Get a Response
+## Step 6: Verifying Configuration with Getter Methods
+
+You can verify your configuration settings using the corresponding getter methods:
+
+```cpp:basic_example.ino
+  // Retrieve and display the current configuration
+  Serial.println("\nAI Configuration:");
+  Serial.print("System Role: ");
+  Serial.println(ai.getChatSystemRole());
+  Serial.print("Temperature: ");
+  Serial.println(ai.getChatTemperature());
+  Serial.print("Max Tokens: ");
+  Serial.println(ai.getChatMaxTokens());
+```
+
+These getter methods allow you to:
+- Confirm that your settings were applied correctly
+- Access current configuration values for logging or debugging
+- Use configuration values in other parts of your application logic
+
+## Step 7: Send a Message and Get a Response
 
 Now we're ready to send a message to the AI and receive a response:
 
@@ -130,7 +151,7 @@ The key function here is `ai.chat()`, which:
 
 We also include error checking to display any issues that might have occurred during the API call.
 
-## Step 7: The Loop Function
+## Step 8: The Loop Function
 
 In this basic example, the `loop()` function is empty:
 
@@ -185,6 +206,26 @@ This modified `loop()` function:
 4. Prints the AI's response
 5. Checks for errors
 
+## Resetting Chat Configuration
+
+If you need to reset the chat configuration to default values, you can use the `chatReset()` method:
+
+```cpp
+// Reset chat configuration to defaults
+ai.chatReset();
+
+// Verify reset was successful
+Serial.println("After reset:");
+Serial.print("System Role: ");
+Serial.println(ai.getChatSystemRole());  // Should be empty
+Serial.print("Temperature: ");
+Serial.println(ai.getChatTemperature());  // Should be -1.0 (default)
+Serial.print("Max Tokens: ");
+Serial.println(ai.getChatMaxTokens());    // Should be -1 (default)
+```
+
+This is useful when you want to start a fresh conversation with different settings or return to the default configuration.
+
 ## Switching Between AI Platforms
 
 One of the key features of the ESP32_AI_Connect library is its ability to work with multiple AI platforms. To switch from OpenAI to Google Gemini or DeepSeek, you only need to change the platform identifier and model name:
@@ -219,6 +260,22 @@ ESP32_AI_Connect ai("openai-compatible", apiKey, "model-name", customEndpoint);
 
 This is useful for self-hosted models or alternative API providers that are compatible with the OpenAI API format.
 
+## Accessing Raw API Responses
+
+For advanced usage, you might want to access the complete raw JSON response from the API. The library provides methods to retrieve these:
+
+```cpp
+// Get the raw JSON response from the last chat request
+String rawResponse = ai.getChatRawResponse();
+Serial.println("Raw API Response:");
+Serial.println(rawResponse);
+
+// For tool calling, you can also get the raw response
+String rawToolResponse = ai.getTCRawResponse();
+```
+
+These methods allow you to access the full API response data for custom processing or debugging.
+
 ## Troubleshooting
 
 If you encounter issues with your AI chat application, here are some common problems and solutions:
@@ -244,3 +301,8 @@ You've now learned how to use the ESP32_AI_Connect library to conduct basic chat
 In the next guide, we'll explore how to use the library's tool calling capabilities to enable your ESP32 to perform specific functions based on AI instructions.
 
 Happy building with ESP32 and AI!
+
+---
+>🚀 **Explore our GitHub** for more projects:  
+>- [ESP32_AI_Connect GitHub Repo](https://github.com/AvantMaker/ESP32_AI_Connect)  
+>- [AvantMaker GitHub](https://github.com/AvantMaker/)

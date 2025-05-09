@@ -91,15 +91,52 @@ bool ESP32_AI_Connect::begin(const char* platformIdentifier, const char* apiKey,
 }
 
 // --- Configuration Setters ---
-void ESP32_AI_Connect::setSystemRole(const char* systemRole) { _systemRole = systemRole; }
-void ESP32_AI_Connect::setTemperature(float temperature) { _temperature = constrain(temperature, 0.0, 2.0); }
-void ESP32_AI_Connect::setMaxTokens(int maxTokens) { _maxTokens = max(1, maxTokens); }
+// Sets the System Role for a standard chat request to define the system's behavior in the conversation.
+void ESP32_AI_Connect::setChatSystemRole(const char* systemRole) { _systemRole = systemRole; }
+// Configures the Temperature parameter of a standard chat request to control the randomness of generated responses.
+void ESP32_AI_Connect::setChatTemperature(float temperature) { _temperature = constrain(temperature, 0.0, 2.0); }
+// Defines the maximum number of tokens for a standard chat request to limit the length of generated responses.
+void ESP32_AI_Connect::setChatMaxTokens(int maxTokens) { _maxTokens = max(1, maxTokens); }
+
+// --- Configuration Getters ---
+// Returns the current System Role set for standard chat requests.
+String ESP32_AI_Connect::getChatSystemRole() const {
+    return _systemRole;
+}
+
+// Returns the current Temperature value set for standard chat requests.
+float ESP32_AI_Connect::getChatTemperature() const {
+    return _temperature;
+}
+
+// Returns the current Maximum Tokens value set for standard chat requests.
+int ESP32_AI_Connect::getChatMaxTokens() const {
+    return _maxTokens;
+}
+
+// --- Raw Response Access Methods ---
+String ESP32_AI_Connect::getChatRawResponse() const {
+    return _chatRawResponse;
+}
+
+String ESP32_AI_Connect::getTCRawResponse() const {
+    return _tcRawResponse;
+}
+
+// --- Reset Methods ---
+void ESP32_AI_Connect::chatReset() {
+    _chatRawResponse = "";
+    _systemRole = "";     // Reset system role set by setChatSystemRole
+    _temperature = -1.0;  // Reset temperature set by setChatTemperature to API default
+    _maxTokens = -1;      // Reset max tokens set by setChatMaxTokens to API default
+}
 
 // --- Get Last Error ---
 String ESP32_AI_Connect::getLastError() const {
     return _lastError;
 }
 
+// --- Get Total Tokens ---
 int ESP32_AI_Connect::getTotalTokens() const {
     if (_platformHandler) {
         return _platformHandler->getTotalTokens();
@@ -117,35 +154,35 @@ String ESP32_AI_Connect::getFinishReason() const {
 
 #ifdef ENABLE_TOOL_CALLS
 // --- Tool Calls Configuration Setters ---
-void ESP32_AI_Connect::setTCSystemRole(const String& systemRole) {
+void ESP32_AI_Connect::setTCChatSystemRole(const String& systemRole) {
     _tcSystemRole = systemRole;
 }
 
-void ESP32_AI_Connect::setTCMaxToken(int maxTokens) {
+void ESP32_AI_Connect::setTCChatMaxTokens(int maxTokens) {
     if (maxTokens > 0) {
         _tcMaxToken = maxTokens;
     }
 }
 
-void ESP32_AI_Connect::setTCToolChoice(const String& toolChoice) {
+void ESP32_AI_Connect::setTCChatToolChoice(const String& toolChoice) {
     _tcToolChoice = toolChoice;
 }
 
 // --- Tool Calls Configuration Getters ---
-String ESP32_AI_Connect::getTCSystemRole() const {
+String ESP32_AI_Connect::getTCChatSystemRole() const {
     return _tcSystemRole;
 }
 
-int ESP32_AI_Connect::getTCMaxToken() const {
+int ESP32_AI_Connect::getTCChatMaxTokens() const {
     return _tcMaxToken;
 }
 
-String ESP32_AI_Connect::getTCToolChoice() const {
+String ESP32_AI_Connect::getTCChatToolChoice() const {
     return _tcToolChoice;
 }
 
 // --- Tool Calls Follow-up Configuration Setters ---
-void ESP32_AI_Connect::setTCReplyMaxToken(int maxTokens) {
+void ESP32_AI_Connect::setTCReplyMaxTokens(int maxTokens) {
     if (maxTokens > 0) {
         _tcFollowUpMaxToken = maxTokens;
     }
@@ -156,7 +193,7 @@ void ESP32_AI_Connect::setTCReplyToolChoice(const String& toolChoice) {
 }
 
 // --- Tool Calls Follow-up Configuration Getters ---
-int ESP32_AI_Connect::getTCReplyMaxToken() const {
+int ESP32_AI_Connect::getTCReplyMaxTokens() const {
     return _tcFollowUpMaxToken;
 }
 
@@ -165,7 +202,7 @@ String ESP32_AI_Connect::getTCReplyToolChoice() const {
 }
 
 // --- Tool Setup ---
-bool ESP32_AI_Connect::tcToolSetup(String* tcTools, int tcToolsSize) {
+bool ESP32_AI_Connect::setTCTools(String* tcTools, int tcToolsSize) {
     _lastError = "";
     
     // --- VALIDATION STEP 1: Check total length ---
@@ -256,9 +293,10 @@ void ESP32_AI_Connect::tcChatReset() {
     _lastUserMessage = "";
     _lastAssistantToolCallsJson = "";
     _lastMessageWasToolCalls = false;
+    _tcRawResponse = ""; // Clear the raw tool calling response
     
     // Reset but don't delete tool definitions
-    // If users want to clear tools, they need to call tcToolSetup with empty array
+    // If users want to clear tools, they need to call setTCTools with empty array
     
     // Reset configuration to defaults
     _tcSystemRole = "";
@@ -273,6 +311,7 @@ void ESP32_AI_Connect::tcChatReset() {
 // --- Perform Tool Calls Chat ---
 String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
     _lastError = "";
+    _tcRawResponse = ""; // Clear previous raw response
     
     // Check if platform handler is initialized
     if (!_platformHandler) {
@@ -282,7 +321,7 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
     
     // Check if tool calls setup has been performed
     if (_tcToolsArray == nullptr || _tcToolsArraySize == 0) {
-        _lastError = "Tool calls not set up. Call tcToolSetup() first.";
+        _lastError = "Tool calls not set up. Call setTCTools() first.";
         return "";
     }
     
@@ -325,6 +364,8 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
         // Handle Response
         if (httpCode > 0) {
             String responsePayload = _httpClient.getString();
+            // Store the raw response
+            _tcRawResponse = responsePayload;
             
             #ifdef ENABLE_DEBUG_OUTPUT
             Serial.println("---------- AI Tool Calls Response ----------");
@@ -370,6 +411,7 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
 // --- Reply to Tool Calls with Results ---
 String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
     _lastError = "";
+    _tcRawResponse = ""; // Clear previous raw response
     
     // Check if platform handler is initialized
     if (!_platformHandler) {
@@ -379,7 +421,7 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
     
     // Check if tool calls setup has been performed
     if (_tcToolsArray == nullptr || _tcToolsArraySize == 0) {
-        _lastError = "Tool calls not set up. Call tcToolSetup() first.";
+        _lastError = "Tool calls not set up. Call setTCTools() first.";
         return "";
     }
     
@@ -469,6 +511,8 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
         // Handle Response
         if (httpCode > 0) {
             String responsePayload = _httpClient.getString();
+            // Store the raw response
+            _tcRawResponse = responsePayload;
             
             #ifdef ENABLE_DEBUG_OUTPUT
             Serial.println("---------- AI Tool Calls Follow-up Response ----------");
@@ -519,6 +563,7 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
 String ESP32_AI_Connect::chat(const String& userMessage) {
     _lastError = "";
     String responseContent = "";
+    _chatRawResponse = ""; // Clear previous raw response
 
     if (!_platformHandler) {
         _lastError = "Platform handler not initialized. Call begin() with a supported platform.";
@@ -533,6 +578,7 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
     }
 
     // Build request body using handler and shared JSON doc
+    // Using values set by setChatSystemRole, setChatTemperature, and setChatMaxTokens
     String requestBody = _platformHandler->buildRequestBody(_modelName, _systemRole,
                                                             _temperature, _maxTokens,
                                                             userMessage, _reqDoc);
@@ -561,6 +607,9 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
         // --- Handle Response ---
         if (httpCode > 0) {
             String responsePayload = _httpClient.getString();
+            // Store the raw response
+            _chatRawResponse = responsePayload;
+            
             #ifdef ENABLE_DEBUG_OUTPUT
             // --- Debug Start: Response ---
             Serial.println("---------- AI Response ----------");

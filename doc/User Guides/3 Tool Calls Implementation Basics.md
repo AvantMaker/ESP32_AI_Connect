@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 3 Tool Calls Implementation Basics
-
+> **Version 0.0.2** • Revised: May 09, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Overview
 
 This guide will walk you through the process of setting up and using tool calls (function calling) with Large Language Models (LLMs) using the ESP32_AI_Connect library. We'll use the `tool_calls_demo.ino` sketch stored in the examples folder as our reference implementation, explaining each component in detail so you can understand how to integrate AI function calling capabilities into your ESP32 projects.
@@ -141,20 +141,20 @@ You can customize the tool calling behavior using optional setter methods:
 
 ```cpp
 // --- Demonstrate Configuration Methods (Optional) ---
-aiClient.setTCSystemRole("You are a weather assistant.");
-aiClient.setTCMaxToken(300);
-aiClient.setTCToolChoice("auto");
+aiClient.setTCChatSystemRole("You are a weather assistant.");
+aiClient.setTCChatMaxTokens(300);
+aiClient.setTCChatToolChoice("auto");
 
 Serial.println("\n--- Tool Call Configuration ---");
-Serial.println("System Role: " + aiClient.getTCSystemRole());
-Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
-Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+Serial.println("System Role: " + aiClient.getTCChatSystemRole());
+Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
 ```
 
 These optional methods allow you to:
-- Set a system role message that defines the AI's behavior (`setTCSystemRole`)
-- Set the maximum number of tokens for the response (`setTCMaxToken`)
-- Set the tool choice parameter (`setTCToolChoice`) which dictates how the AI selects tools
+- Set a system role message that defines the AI's behavior (`setTCChatSystemRole`)
+- Set the maximum number of tokens for the response (`setTCChatMaxTokens`)
+- Set the tool choice parameter (`setTCChatToolChoice`) which dictates how the AI selects tools
 
 Each setter also has a corresponding getter method to retrieve the current value.
 
@@ -228,7 +228,27 @@ Here's a table that summarizes the different finish reason values used by each p
 
 This distinction is important when checking the `finishReason` in your code to determine if you need to execute tools based on the AI's response.
 
-## Step 10: Parse and Execute Tool Calls
+## Step 10: Accessing the Complete Raw API Response
+
+For debugging or advanced scenarios, you may want to access the complete raw JSON response from the AI server:
+
+```cpp
+// Get the raw server response
+String rawResponse = aiClient.getTCRawResponse();
+Serial.println("\n--- Raw API Response ---");
+Serial.println(rawResponse);
+```
+
+The `getTCRawResponse()` method returns the complete server response JSON for the last tool calling method executed (either `tcChat` or `tcReply`). This can be useful for:
+
+- Debugging API interactions
+- Accessing additional response information not exposed by the library
+- Custom parsing of complex response data
+- Monitoring token usage and other metadata
+
+This raw response includes all fields returned by the AI platform, not just the extracted tool calls or content.
+
+## Step 11: Parse and Execute Tool Calls
 
 When you receive tool calls, you must parse the JSON response and execute the requested functions. A practical example of how to parse and handle tool calls can be found in the tool_calling_demo_2 example code located in the examples folder.
 
@@ -258,7 +278,7 @@ if (error) {
 
 This code parses the tool calls JSON array and extracts the function name, ID, and arguments for each tool call.
 
-## Step 11: Reset Tool Call Settings
+## Step 12: Reset Tool Call Settings
 
 After completing a tool call operation, you can reset the tool call settings to their default values:
 
@@ -268,12 +288,17 @@ Serial.println("\nResetting tool call settings to defaults...");
 aiClient.tcChatReset();
 
 Serial.println("\n--- Tool Call Configuration After Reset ---");
-Serial.println("System Role: " + aiClient.getTCSystemRole());
-Serial.println("Max Tokens: " + String(aiClient.getTCMaxToken()));
-Serial.println("Tool Choice: " + aiClient.getTCToolChoice());
+Serial.println("System Role: " + aiClient.getTCChatSystemRole());
+Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
+Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
+
+// Verify raw response was cleared
+if (aiClient.getTCRawResponse().isEmpty()) {
+  Serial.println("Raw response was cleared successfully");
+}
 ```
 
-The `tcChatReset()` method resets all tool call parameters to their default values.
+The `tcChatReset()` method resets all tool call parameters to their default values and clears the stored raw response.
 
 ## Advanced: Using Multiple Tools
 
@@ -367,12 +392,19 @@ If you encounter issues with tool calls, here are some common problems and solut
 
 5. **Tool Definition Too Large**: If your tool definition is too large, you'll get an error. Increase `AI_API_REQ_JSON_DOC_SIZE` in the configuration file.
 
+6. **Debug with Raw Response**: If you're not sure why something isn't working, examine the raw response with `getTCRawResponse()` to see the complete server response.
+
 ## Conclusion
 
 You've now learned how to use the ESP32_AI_Connect library to implement tool calls with LLMs. This powerful feature allows your ESP32 to act as an intelligent agent, executing functions based on natural language instructions and providing the results back to the AI for further processing.
 
-With the new setter/getter methods and the `tcChatReset()` function, you have greater control over the tool calling behavior, allowing you to create more flexible and sophisticated AI-powered IoT applications.
+With the setter/getter methods, the `tcChatReset()` function, and the raw response access methods, you have greater control over the tool calling behavior, allowing you to create more flexible and sophisticated AI-powered IoT applications.
 
 Tool calls open up a world of possibilities for creating smart IoT devices that can interact with their environment based on AI-driven decisions. You can create weather stations, home automation systems, data loggers, and much more, all controlled through natural language.
 
 Happy building with ESP32 and AI!
+
+---
+>🚀 **Explore our GitHub** for more projects:  
+>- [ESP32_AI_Connect GitHub Repo](https://github.com/AvantMaker/ESP32_AI_Connect)  
+>- [AvantMaker GitHub](https://github.com/AvantMaker/)
