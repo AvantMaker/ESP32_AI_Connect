@@ -1,12 +1,12 @@
 # ESP32_AI_Connect Library User Guide - 1 Introduction
-> **Version 0.0.2** • Revised: May 09, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Version 0.0.3** • Revised: May 10, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Overview
 
 ESP32_AI_Connect is a powerful, flexible library designed to connect ESP32 microcontrollers to various Large Language Model (LLM) platforms. This library simplifies the process of integrating AI capabilities into your ESP32 projects, allowing you to create intelligent IoT devices, smart assistants, and interactive applications with minimal effort.
 
 ## Key Features
 
-- **Multi-Platform Support**: Connect to multiple AI platforms including OpenAI, Google Gemini, and DeepSeek
+- **Multi-Platform Support**: Connect to multiple AI platforms including OpenAI, Anthropic Claude, Google Gemini, and DeepSeek
 - **Simple API**: Easy-to-use interface for sending prompts and receiving responses
 - **Tool Calls Support**: Enable your ESP32 to use LLM function calling capabilities
 - **Memory Efficient**: Optimized for the limited resources of ESP32 devices
@@ -31,7 +31,7 @@ The library follows a well-structured design pattern:
 
 1. **ESP32_AI_Connect**: The main class that users interact with
 2. **AI_API_Platform_Handler**: An abstract base class that defines a common interface for all AI platforms
-3. **Platform-Specific Handlers**: Implementations for each supported AI platform (OpenAI, Gemini, DeepSeek)
+3. **Platform-Specific Handlers**: Implementations for each supported AI platform (OpenAI, Gemini, DeepSeek, Anthropic, etc.)
 
 This architecture allows you to switch between different AI platforms with minimal code changes, while also making it easy to extend the library with support for new platforms.
 
@@ -41,10 +41,10 @@ To use ESP32_AI_Connect in your project, you'll need:
 
 - An ESP32 development board
 - Arduino IDE or PlatformIO
-- An API key for your chosen AI platform (OpenAI, Google Gemini, or DeepSeek)
+- An API key for your chosen AI platform (OpenAI, Google Gemini, Anropic Claude or DeepSeek)
 - WiFi connectivity
 
-The library can be installed through the Arduino Library Manager or by downloading the source code from the repository.
+The library can be installed by downloading the source code from the repository.
 
 ## Basic Usage Example
 
@@ -65,10 +65,10 @@ const char* password = "your_PASSWORD"; // Your WiFi password
 const char* apiKey = "your_API_KEY";    // Your OpenAI API key (keep this secure!)
 
 // Initialize AI client with:
-// 1. Platform identifier ("openai", "gemini", or "deepseek")
+// 1. Platform identifier ("openai", "gemini", "claude", or "deepseek")
 // 2. Your API key
 // 3. Model name ("gpt-3.5-turbo" for this example)
-ESP32_AI_Connect ai("openai", apiKey, "gpt-3.5-turbo");
+ESP32_AI_Connect aiClient("openai", apiKey, "gpt-3.5-turbo");
 
 void setup() {
   // Initialize serial communication for debugging
@@ -86,17 +86,26 @@ void setup() {
   
   // WiFi connected - print IP address
   Serial.println("\nWiFi connected!");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
 
-  // Configure AI client parameters:
-  ai.setTemperature(0.7);       // Set response creativity (0.0-2.0)
-  ai.setMaxTokens(200);         // Limit response length (in tokens)
-  ai.setSystemRole("You are a helpful assistant");  // Set assistant behavior
+  // Optional: You can use the following methods to Configure AI client parameters, such as
+  //           System Role, Max Tokens, etc. 
+  //           The LLM will use default values when interacting with AI Client if these parameters
+  //           are not set.
+  aiClient.setChatTemperature(0.7);       // Set response creativity (0.0-2.0)
+  aiClient.setChatMaxTokens(200);         // Limit response length (in tokens)
+  aiClient.setChatSystemRole("You are a helpful assistant");  // Set assistant behavior
+  
+  // You can retrieve current settings using getter methods:
+  Serial.print("Current temperature: ");
+  Serial.println(aiClient.getChatTemperature());
+  Serial.print("Maximum tokens: ");
+  Serial.println(aiClient.getChatMaxTokens());
+  Serial.print("System role: ");
+  Serial.println(aiClient.getChatSystemRole());
 
   // Send a test message to the AI and get response
   Serial.println("\nSending message to AI...");
-  String response = ai.chat("Hello! Who are you?");
+  String response = aiClient.chat("Hello! Who are you?");
   
   // Print the AI's response
   Serial.println("\nAI Response:");
@@ -104,7 +113,7 @@ void setup() {
 
   // Check for errors (empty response indicates an error occurred)
   if (response.isEmpty()) {
-    Serial.println("Error: " + ai.getLastError());
+    Serial.println("Error: " + aiClient.getLastError());
   }
 }
 
@@ -119,7 +128,7 @@ void loop() {
 This introduction provides a high-level overview of the ESP32_AI_Connect library. In the following guides, we'll explore:
 
 1. **Basic Chat with LLMs**: How to set up and conduct conversations with different AI models
-2. **Tool Calls**: How to enable your ESP32 to use LLM function calling capabilities
+2. **Tool Calls**: How to enable your ESP32 to use LLM tool calling capabilities
 3. And more as new features are added
 
 Each guide will include detailed explanations, code examples, and best practices to help you get the most out of the ESP32_AI_Connect library.

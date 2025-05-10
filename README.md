@@ -18,6 +18,7 @@ Visit us at [AvantMaker.com](https://www.avantmaker.com) where we've crafted a c
 ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to interact seamlessly with popular AI APIs including:
 - OpenAI
 - Google Gemini
+- Anthroic Claude
 - DeepSeek
 - OpenAI-Compatible (HuggingFace, Qwen, etc.)
 - And more to be included...
@@ -49,7 +50,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 | Anthropic Claude | `"claude"`| claude-3.7-sonnet, claude-3.5-haiku, etc.               | Yes               | Under Development                |
 | OpenAI Compatible | `"openai-compatible"`| HuggingFace, Qwen, etc.                       | See Note 1 below               | Under Development               |
 
-**Note 1:** Support for tool calls varies across platforms and models. Therefore, the availability of the `tool_calls` functionality of the OpenAI Compatible platform depends on the specific platform and model you select.
+**Note 1:** Tool call support differs by platform and model, so the availability of the `tool_calls` feature on the OpenAI Compatible platform depends on your chosen platform and model.
 
 **Note 2:** We are actively working to add Grok and Ollama to the list of supported platforms.
 
@@ -88,10 +89,10 @@ const char* password = "your_PASSWORD"; // Your WiFi password
 const char* apiKey = "your_API_KEY";    // Your OpenAI API key (keep this secure!)
 
 // Initialize AI client with:
-// 1. Platform identifier ("openai", "gemini", or "deepseek")
+// 1. Platform identifier ("openai", "gemini", "claude", or "deepseek")
 // 2. Your API key
 // 3. Model name ("gpt-3.5-turbo" for this example)
-ESP32_AI_Connect ai("openai", apiKey, "gpt-3.5-turbo");
+ESP32_AI_Connect aiClient("openai", apiKey, "gpt-3.5-turbo");
 
 void setup() {
   // Initialize serial communication for debugging
@@ -109,25 +110,26 @@ void setup() {
   
   // WiFi connected - print IP address
   Serial.println("\nWiFi connected!");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
 
-  // Configure AI client parameters:
-  ai.setChatTemperature(0.7);       // Set response creativity (0.0-2.0)
-  ai.setChatMaxTokens(200);         // Limit response length (in tokens)
-  ai.setChatSystemRole("You are a helpful assistant");  // Set assistant behavior
+  // Optional: You can use the following methods to Configure AI client parameters, such as
+  //           System Role, Max Tokens, etc. 
+  //           The LLM will use default values when interacting with AI Client if these parameters
+  //           are not set.
+  aiClient.setChatTemperature(0.7);       // Set response creativity (0.0-2.0)
+  aiClient.setChatMaxTokens(200);         // Limit response length (in tokens)
+  aiClient.setChatSystemRole("You are a helpful assistant");  // Set assistant behavior
   
   // You can retrieve current settings using getter methods:
   Serial.print("Current temperature: ");
-  Serial.println(ai.getChatTemperature());
+  Serial.println(aiClient.getChatTemperature());
   Serial.print("Maximum tokens: ");
-  Serial.println(ai.getChatMaxTokens());
+  Serial.println(aiClient.getChatMaxTokens());
   Serial.print("System role: ");
-  Serial.println(ai.getChatSystemRole());
+  Serial.println(aiClient.getChatSystemRole());
 
   // Send a test message to the AI and get response
   Serial.println("\nSending message to AI...");
-  String response = ai.chat("Hello! Who are you?");
+  String response = aiClient.chat("Hello! Who are you?");
   
   // Print the AI's response
   Serial.println("\nAI Response:");
@@ -135,7 +137,7 @@ void setup() {
 
   // Check for errors (empty response indicates an error occurred)
   if (response.isEmpty()) {
-    Serial.println("Error: " + ai.getLastError());
+    Serial.println("Error: " + aiClient.getLastError());
   }
 }
 
