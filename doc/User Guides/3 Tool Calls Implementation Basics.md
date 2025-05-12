@@ -1,8 +1,8 @@
 # ESP32_AI_Connect Library User Guide - 3 Tool Calls Implementation Basics
-> **Version 0.0.2** • Revised: May 09, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Version 0.0.5** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Overview
 
-This guide will walk you through the process of setting up and using tool calls (function calling) with Large Language Models (LLMs) using the ESP32_AI_Connect library. We'll use the `tool_calls_demo.ino` sketch stored in the examples folder as our reference implementation, explaining each component in detail so you can understand how to integrate AI function calling capabilities into your ESP32 projects.
+This guide will walk you through the process of setting up and using tool calls (tool calling) with Large Language Models (LLMs) using the ESP32_AI_Connect library. We'll use the `tool_calling_demo.ino` sketch stored in the examples folder as our reference implementation, explaining each component in detail so you can understand how to integrate AI tool calling capabilities into your ESP32 projects with ESP32_AI_Connect.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ Before you begin, make sure you have:
 - Arduino IDE installed with ESP32 board support
 - ESP32_AI_Connect library installed
 - WiFi connectivity
-- An API key for your chosen AI platform (OpenAI is recommended for tool calls)
+- An API key for your chosen AI platform (Ensure the AI Model you choose supports Tool Calls functionality)
 - Basic understanding of JSON and Arduino programming
 
 ## Step 1: Enable Tool Calls in Configuration
@@ -21,7 +21,7 @@ First, ensure that tool calls support is enabled in the library configuration fi
 
 ```cpp
 // --- Tool Calls Support ---
-// Uncomment the following line to enable tool calls (function calling) support
+// Uncomment the following line to enable tool calls (tool calling) support
 // This will add tcToolSetup and tcChat methods to the library
 // If you don't need tool calls, keep this commented out to save memory
 #define ENABLE_TOOL_CALLS
@@ -60,7 +60,7 @@ ESP32_AI_Connect aiClient(platform, apiKey, model);
 ```
 
 This line initializes the AI client with parameters:
-- The platform identifier (typically `"openai"` for tool calls)
+- The platform identifier ("openai", "gemini", "claude" or "deepseek", etc.)
 - Your API key
 - The model name (e.g., `"gpt-3.5-turbo"` or `"gpt-4"`)
 - Optional custom endpoint (if you're using a custom API endpoint)
@@ -93,7 +93,7 @@ void setup() {
 
 ## Step 5: Define Your Tools
 
-Tool calls require defining the functions that the AI can call. Each tool is defined as a JSON object that specifies the function name, description, and parameters:
+Tool calls require defining the tool(s) that the AI can call. Each tool is defined as a JSON object that specifies the function name, description, and parameters:
 
 ```cpp
 // --- Define Tools for Tool Calling ---
@@ -158,7 +158,7 @@ These optional methods allow you to:
 
 Each setter also has a corresponding getter method to retrieve the current value.
 
-Different AI platforms support different `toolChoice` parameters. The table below shows the allowed values for each platform:
+Different AI platforms support different `tool_choice` parameters. The table below shows the allowed values for each platform:
 
 | Tool Choice Mode | OpenAI API | Gemini API | Anthropic Claude API |
 |------------------|------------|------------|----------------------|
@@ -171,13 +171,13 @@ Different AI platforms support different `toolChoice` parameters. The table belo
 Notes on tool choice options:
 - `"auto"`: Let the AI decide whether to use tools (default behavior)
 - `"none"`: Don't use tools
-- `"required"`: (OpenAI only) Forces the model to use a tool
-- `"any"`: (Gemini and Claude only) Model should use a tool if relevant
+- `"required"`: (OpenAI and OpenAI Compatible) Forces the model to use a tool
+- `"any"`: (Gemini and Claude) Model should use a tool if relevant
 - Tool Choice JSON: Specifies a particular tool to use (format varies by platform)
 
 ## Step 8: Send a Message to Trigger Tool Calls
 
-Now we can send a message that will likely trigger a tool call:
+Now we can send a message that may trigger a tool call based on user prompt content:
 
 ```cpp
 // --- Perform Tool Calling Chat ---

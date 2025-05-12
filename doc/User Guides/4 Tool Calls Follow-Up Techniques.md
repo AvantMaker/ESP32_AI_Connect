@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 4 Tool Calls Follow-Up Techniques
-> **Version 0.0.2** • Revised: May 09, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Version 0.0.3** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Introduction
 
 This article is a follow-up to the previous guide "Tool Calls Implementation Basics". If you haven't read that article yet, please do so before continuing, as this guide builds upon the concepts introduced there.
@@ -94,12 +94,6 @@ String getWeatherData(const String& city, const String& units) {
 }
 ```
 
-The tool results must be formatted as a JSON array of objects, where each object contains:
-- `tool_call_id`: The ID of the tool call (provided by the AI in the original tool call)
-- `function`: An object containing:
-  - `name`: The name of the function that was called
-  - `output`: The result of the function execution (as a string)
-
 ## Step 2: Parsing Tool Calls and Executing Functions
 
 When you receive a response with tool calls, you need to parse the JSON and execute the appropriate functions:
@@ -167,15 +161,22 @@ String toolResultsJson;
 serializeJson(toolResults, toolResultsJson);
 ```
 
+
+The tool results must be formatted as a JSON array of objects, where each object contains:
+- `tool_call_id`: The ID of the tool call (provided by the AI in the original tool call)
+- `function`: An object containing:
+  - `name`: The name of the function that was called
+  - `output`: The result of the function execution (as a string)
+
 ## Step 3: Sending the Tool Results Back to the AI
 
 Before sending the results back to the AI, you can configure the follow-up request with separate parameters:
 
 ```cpp
-// Additional follow-up configuration
+// Additional follow-up optional configuration
 // These only affect the follow-up request, not the initial tool call
-aiClient.setTCReplyMaxTokens(350);   // Maximum tokens for the follow-up response
-aiClient.setTCReplyToolChoice("auto"); // Tool choice for the follow-up (can be different from initial)
+aiClient.setTCReplyMaxTokens(350);   // (Optional) Maximum tokens for the follow-up response
+aiClient.setTCReplyToolChoice("auto"); // (Optional) Tool choice for the follow-up (can be different from initial)
 
 // You can also use a JSON string to specify a particular tool
 // aiClient.setTCReplyToolChoice(R"({"type": "function","function": {"name": "control_device"}})");
@@ -226,11 +227,22 @@ else {
 }
 ```
 
-Note that different AI platforms use different terminology for finish reasons:
+Note that different AI platforms use different terminology for folow-up tool calling finish reasons:
 - OpenAI and Gemini use "tool_calls"
-- Anthropic Claude uses "tool_use"
-- OpenAI and Gemini use "stop" for completed responses
-- Anthropic Claude uses "end_turn" for completed responses
+  
+  This indicates the AI is requesting for more tool calling to complete user's requests.
+
+- OpenAI and Gemini use "stop" 
+
+  This indicates the AI has completed  user's follow-up tool calling requests.
+
+- Anthropic Claude uses "tool_use" 
+
+  This indicates the AI is requesting for more tool calling to complete user's requests.
+
+- Anthropic Claude uses "end_turn" 
+
+  This indicates the AI has completed  user's follow-up tool calling requests.
 
 ## Resetting Tool Call Configuration
 
@@ -266,7 +278,7 @@ Let's walk through the complete flow of a tool call interaction using the exampl
      while(1) { delay(1000); } // Halt on failure
    }
    
-   // Configure tool calling parameters
+   // Configure optional tool calling parameters
    aiClient.setTCChatSystemRole("You are a smart home assistant.");
    aiClient.setTCChatMaxTokens(300);
    aiClient.setTCChatToolChoice("auto");
@@ -293,7 +305,7 @@ Let's walk through the complete flow of a tool call interaction using the exampl
    // ... (code from Step 2 above) ...
    ```
 
-5. **Configure Follow-Up Request**: Set parameters for the follow-up request
+5. **Configure Follow-Up Request(Optional)**: Set parameters for the follow-up request
    ```cpp
    aiClient.setTCReplyMaxTokens(350);
    aiClient.setTCReplyToolChoice("auto");
@@ -308,11 +320,6 @@ Let's walk through the complete flow of a tool call interaction using the exampl
 7. **Process Final Response**: Display or act on the AI's final response
    ```cpp
    // ... (code from Step 4 above) ...
-   ```
-
-8. **Reset Configuration**: Clear all tool call settings
-   ```cpp
-   aiClient.tcChatReset();
    ```
 
 ## Key Considerations for Tool Call Follow-Up

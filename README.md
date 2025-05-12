@@ -147,8 +147,8 @@ void loop() {
 }
 ```
 
-## Tool Calls Support
-Tool calls (function calling) enable the AI model to request specific actions from your ESP32 application. This feature allows:
+## Tool Calls (Tool Calling) Support
+Tool calls (a.k.a. talling calling) enable the AI model to request specific actions from your ESP32 application. This feature allows:
 
 - Two-way interaction : AI can request data or actions from your device
 - Structured data exchange : Receive properly formatted JSON for easy parsing
