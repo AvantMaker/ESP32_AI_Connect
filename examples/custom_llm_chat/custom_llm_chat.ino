@@ -15,8 +15,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 7, 2025
- * Version: 1.0.1
+ * Date: May 15, 2025
+ * Version: 1.0.3
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -34,7 +34,7 @@
  * Repository: https://github.com/AvantMaker/ESP32_AI_Connect
  * 
  * Usage Notes:
- * - Adjust `setChatSystemRole`, `setChatTemperature`, and `setChatMaxTokens` in `setup()` to customize LLM behavior.
+ * - Adjust optional parameters with `setChatSystemRole`, `setChatTemperature`, and `setChatMaxTokens` in `setup()` to customize LLM behavior.
  * - Use getter methods like `getChatSystemRole`, `getChatTemperature`, and `getChatMaxTokens` to retrieve current settings.
  * - Enter messages via the Serial Monitor to interact with the LLM; responses and errors are displayed.
  * - Verify the custom endpoint URL is correct and accessible for your LLM provider.
@@ -92,16 +92,20 @@ void setup() {
     while(1) delay(1000); // Halt on failure
   }
 
-  // --- Configure the AI Client ---
+  // --- Configure the AI Client's optional parameters ---
   aiClient.setChatSystemRole("You are a helpful assistant.");
   aiClient.setChatTemperature(0.7); // Set creativity/randomness
   aiClient.setChatMaxTokens(150);   // Limit response length
-
+  
   // Print configuration
   Serial.println("\nAI Client Configuration:");
   Serial.println("Platform: " + String(platform));
   Serial.println("Model: " + String(model));
   Serial.println("Custom Endpoint: " + String(customEndpoint));
+
+  // Display the configured parameters set by setChatSystemRole/setChatTemperature/setChatMaxTokens
+  Serial.println("\nDisplay the configured parameters set by");
+  Serial.println("\nsetChatSystemRole / setChatTemperature / setChatMaxTokens:");
   Serial.print("System Role: ");
   Serial.println(aiClient.getChatSystemRole());
   Serial.print("Temperature: ");

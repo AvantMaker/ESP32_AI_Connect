@@ -23,7 +23,8 @@ void AI_API_OpenAI_Handler::setHeaders(HTTPClient& httpClient, const String& api
 
 String AI_API_OpenAI_Handler::buildRequestBody(const String& modelName, const String& systemRole,
                                                float temperature, int maxTokens,
-                                               const String& userMessage, JsonDocument& doc) {
+                                               const String& userMessage, JsonDocument& doc,
+                                               const String& customParams) {
     // Move the logic from the original _buildOpenAIRequest here
     // IMPORTANT: Use the provided 'doc' reference, don't create a new one. Clear it first.
     doc.clear();
@@ -39,8 +40,28 @@ String AI_API_OpenAI_Handler::buildRequestBody(const String& modelName, const St
     userMsg["role"] = "user";
     userMsg["content"] = userMessage;
 
+    // Process custom parameters if provided
+    if (customParams.length() > 0) {
+        // Create a temporary document to parse the custom parameters
+        DynamicJsonDocument paramsDoc(512);
+        DeserializationError error = deserializeJson(paramsDoc, customParams);
+        
+        // Only proceed if parsing was successful
+        if (!error) {
+            // Add each parameter from customParams to the request
+            for (JsonPair param : paramsDoc.as<JsonObject>()) {
+                // Skip model, messages as they are handled separately
+                if (param.key() != "model" && param.key() != "messages") {
+                    // Copy the parameter to our request document
+                    doc[param.key()] = param.value();
+                }
+            }
+        }
+    }
+    
+    // Add standard parameters if set (these override any matching custom parameters)
     if (temperature >= 0.0) doc["temperature"] = temperature;
-    if (maxTokens > 0) doc["max_tokens"] = maxTokens;
+    if (maxTokens > 0) doc["max_completion_tokens"] = maxTokens;
     // Add other OpenAI specific params like response_format if needed
 
     String requestBody;
@@ -107,9 +128,9 @@ String AI_API_OpenAI_Handler::buildToolCallsRequestBody(const String& modelName,
     // Set the model
     doc["model"] = modelName;
     
-    // Add max_tokens parameter if specified
+    // Add max_completion_tokens parameter if specified
     if (maxTokens > 0) {
-        doc["max_tokens"] = maxTokens;
+        doc["max_completion_tokens"] = maxTokens;
     }
     
     // Add messages array
@@ -400,9 +421,9 @@ String AI_API_OpenAI_Handler::buildToolCallsFollowUpRequestBody(const String& mo
     // Set the model
     doc["model"] = modelName;
     
-    // Add max_tokens parameter if specified for follow-up
+    // Add max_completion_tokens parameter if specified for follow-up
     if (followUpMaxTokens > 0) {
-        doc["max_tokens"] = followUpMaxTokens;
+        doc["max_completion_tokens"] = followUpMaxTokens;
     }
     
     // Add messages array for the conversation

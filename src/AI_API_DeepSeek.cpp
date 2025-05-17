@@ -23,7 +23,8 @@ void AI_API_DeepSeek_Handler::setHeaders(HTTPClient& httpClient, const String& a
 
 String AI_API_DeepSeek_Handler::buildRequestBody(const String& modelName, const String& systemRole,
                                                float temperature, int maxTokens,
-                                               const String& userMessage, JsonDocument& doc) {
+                                               const String& userMessage, JsonDocument& doc,
+                                               const String& customParams) {
     // DeepSeek follows OpenAI's format with some minor differences
     // Use the provided 'doc' reference. Clear it first.
     doc.clear();
@@ -39,7 +40,26 @@ String AI_API_DeepSeek_Handler::buildRequestBody(const String& modelName, const 
     userMsg["role"] = "user";
     userMsg["content"] = userMessage;
 
-    // Add configuration parameters if provided
+    // Process custom parameters if provided
+    if (customParams.length() > 0) {
+        // Create a temporary document to parse the custom parameters
+        DynamicJsonDocument paramsDoc(512);
+        DeserializationError error = deserializeJson(paramsDoc, customParams);
+        
+        // Only proceed if parsing was successful
+        if (!error) {
+            // Add each parameter from customParams to the request
+            for (JsonPair param : paramsDoc.as<JsonObject>()) {
+                // Skip model, messages as they are handled separately
+                if (param.key() != "model" && param.key() != "messages") {
+                    // Copy the parameter to our request document
+                    doc[param.key()] = param.value();
+                }
+            }
+        }
+    }
+    
+    // Add configuration parameters if provided (these will override any from customParams)
     if (temperature >= 0.0) doc["temperature"] = temperature;
     if (maxTokens > 0) doc["max_tokens"] = maxTokens;
     

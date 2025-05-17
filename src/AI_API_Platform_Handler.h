@@ -45,7 +45,8 @@ public:
     // Returns the serialized JSON string or empty string on error
     virtual String buildRequestBody(const String& modelName, const String& systemRole,
                                     float temperature, int maxTokens,
-                                    const String& userMessage, JsonDocument& doc) = 0;
+                                    const String& userMessage, JsonDocument& doc,
+                                    const String& customParams = "") = 0;
 
     // Parse the JSON response payload
     // Takes raw response, reference to error string, and JsonDocument reference

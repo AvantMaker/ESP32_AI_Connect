@@ -53,6 +53,11 @@ public:
     // Defines the maximum number of tokens for a standard chat request to limit the length of generated responses.
     void setChatMaxTokens(int maxTokens);
     
+    // Sets custom parameters for standard chat requests in JSON format
+    // Example: {"top_p": 0.9, "frequency_penalty": 0.5}
+    // Returns false if the JSON string is invalid
+    bool setChatParameters(String userParameterJsonStr);
+    
     // Getter methods for standard chat request configuration
     // Returns the current System Role set for standard chat requests.
     String getChatSystemRole() const;
@@ -60,6 +65,8 @@ public:
     float getChatTemperature() const;
     // Returns the current Maximum Tokens value set for standard chat requests.
     int getChatMaxTokens() const;
+    // Returns the current custom parameters set for standard chat requests as JSON string
+    String getChatParameters() const;
 
     // Main chat function - delegates to the handler
     String chat(const String& userMessage);
@@ -67,6 +74,13 @@ public:
     // Raw response access methods
     String getChatRawResponse() const;
     String getTCRawResponse() const;
+    
+    // Get HTTP response code from the last chat request
+    int getChatResponseCode() const;
+    
+    // Get HTTP response codes from tool calling requests
+    int getTCChatResponseCode() const;
+    int getTCReplyResponseCode() const;
     
     // Reset methods
     void chatReset();
@@ -159,10 +173,14 @@ private:
     String _customEndpoint = "";  // New member for custom endpoint
     float _temperature = -1.0; // Use API default
     int _maxTokens = -1;       // Use API default
+    String _chatCustomParams = ""; // Store custom parameters as JSON string
     
     // Raw response storage
     String _chatRawResponse = "";    // Store the raw response from chat method
     String _tcRawResponse = "";      // Store the raw response from last tool calling method (tcChat or tcReply)
+    int _chatResponseCode = 0;       // Store the HTTP response code from the last chat request
+    int _tcChatResponseCode = 0;     // Store the HTTP response code from the last tcChat request
+    int _tcReplyResponseCode = 0;    // Store the HTTP response code from the last tcReply request
 
 #ifdef ENABLE_TOOL_CALLS
     // Tool calls configuration storage

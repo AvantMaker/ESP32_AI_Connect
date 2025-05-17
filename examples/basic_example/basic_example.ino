@@ -10,8 +10,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 7, 2025
- * Version: 1.0.5
+ * Date: May 15, 2025
+ * Version: 1.0.7
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit, etc.)
@@ -30,7 +30,7 @@
  * Repository: https://github.com/AvantMaker/ESP32_AI_Connect
  * 
  * Usage Notes:
- * - Adjust `setChatTemperature`, `setChatMaxTokens`, and `setChatSystemRole` as
+ * - Adjust optional`setChatTemperature`, `setChatMaxTokens`, and `setChatSystemRole` as
  *   needed for your application.
  * - Use getter methods like `getChatTemperature`, `getChatMaxTokens`, and `getChatSystemRole` 
  *   to retrieve current configuration values.
@@ -71,13 +71,14 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  // Configure AI client parameters:
-  aiClient.setChatTemperature(0.7);       // Set response creativity (0.0-2.0)
+  // Configure optional parameters:
+  aiClient.setChatTemperature(0.7);       // Set response creativity (0.0-2.0) 
   aiClient.setChatMaxTokens(200);         // Limit response length (in tokens)
   aiClient.setChatSystemRole("You are a helpful assistant");  // Set assistant behavior
 
-  // Display the configured parameters
-  Serial.println("\nAI Configuration:");
+  // Display the configured parameters set by setChatSystemRole/setChatTemperature/setChatMaxTokens
+  Serial.println("\nDisplay the configured parameters set by");
+  Serial.println("\nsetChatSystemRole / setChatTemperature / setChatMaxTokens:");
   Serial.print("System Role: ");
   Serial.println(aiClient.getChatSystemRole());
   Serial.print("Temperature: ");

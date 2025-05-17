@@ -22,7 +22,8 @@ void AI_API_Gemini_Handler::setHeaders(HTTPClient& httpClient, const String& api
 
 String AI_API_Gemini_Handler::buildRequestBody(const String& modelName, const String& systemRole,
                                                float temperature, int maxTokens,
-                                               const String& userMessage, JsonDocument& doc) {
+                                               const String& userMessage, JsonDocument& doc,
+                                               const String& customParams) {
     // Use the provided 'doc' reference. Clear it first.
     doc.clear();
 
@@ -44,10 +45,60 @@ String AI_API_Gemini_Handler::buildRequestBody(const String& modelName, const St
     JsonObject userTextPart = userParts.createNestedObject();
     userTextPart["text"] = userMessage;
 
+    // --- Process custom parameters if provided ---
+    if (customParams.length() > 0) {
+        // Create a temporary document to parse the custom parameters
+        DynamicJsonDocument paramsDoc(512);
+        DeserializationError error = deserializeJson(paramsDoc, customParams);
+        
+        // Only proceed if parsing was successful
+        if (!error) {
+            // Check if there are parameters specifically for generationConfig
+            JsonObject generationConfig;
+            bool hasGenerationConfig = false;
+            
+            for (JsonPair param : paramsDoc.as<JsonObject>()) {
+                // These parameters should go into generationConfig object
+                if (param.key() == "temperature" || param.key() == "topP" || 
+                    param.key() == "topK" || param.key() == "maxOutputTokens" ||
+                    param.key() == "candidateCount" || param.key() == "stopSequences" ||
+                    param.key() == "responseMimeType" || param.key() == "responseSchema" ||
+                    param.key() == "presencePenalty" || param.key() == "frequencyPenalty" ||
+                    param.key() == "seed" || param.key() == "responseLogprobs" ||
+                    param.key() == "logprobs" || param.key() == "enableEnhancedCivicAnswers" || 
+                    param.key() == "speechConfig" || param.key() == "thinkingConfig" || 
+                    param.key() == "mediaResolution") {
+                    
+                    // Create generationConfig object if it doesn't exist yet
+                    if (!hasGenerationConfig) {
+                        generationConfig = doc.createNestedObject("generationConfig");
+                        hasGenerationConfig = true;
+                    }
+                    generationConfig[param.key()] = param.value();
+                }
+                // Other parameters go directly into the root object
+                else if (param.key() != "model" && param.key() != "contents" && 
+                         param.key() != "systemInstruction") {
+                    doc[param.key()] = param.value();
+                }
+            }
+        }
+    }
+
     // --- Add Generation Config (Optional) ---
     // Reference: https://ai.google.dev/docs/rest_api_overview#generationconfig
-    JsonObject generationConfig = doc.createNestedObject("generationConfig");
+    // These will override any values set by custom parameters
     bool configAdded = false;
+    JsonObject generationConfig;
+    
+    // Check if generationConfig already exists from custom parameters
+    if (doc.containsKey("generationConfig")) {
+        generationConfig = doc["generationConfig"];
+        configAdded = true;
+    } else {
+        generationConfig = doc.createNestedObject("generationConfig");
+    }
+    
     if (temperature >= 0.0) {
         generationConfig["temperature"] = temperature; // Control randomness
         configAdded = true;
@@ -56,9 +107,6 @@ String AI_API_Gemini_Handler::buildRequestBody(const String& modelName, const St
         generationConfig["maxOutputTokens"] = maxTokens; // Max length of response
         configAdded = true;
     }
-    // Add other params like topP, topK, stopSequences if needed
-    // generationConfig["topK"] = ...;
-    // generationConfig["topP"] = ...;
 
     if (!configAdded) {
         // Remove empty generationConfig object if no parameters were set

@@ -10,8 +10,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 8, 2025
- * Version: 1.0.3
+ * Date: May 15, 2025
+ * Version: 1.0.7
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -29,7 +29,7 @@
  * Repository: https://github.com/AvantMaker/ESP32_AI_Connect
  * 
  * Usage Notes:
- * - Adjust `setChatSystemRole`, `setChatTemperature`, and `setChatMaxTokens` in `setup()` to customize AI behavior.
+ * - Adjust optional parameters with `setChatSystemRole`, `setChatTemperature`, and `setChatMaxTokens` in `setup()` to customize AI behavior.
  * - Use getter methods like `getChatSystemRole`, `getChatTemperature`, and `getChatMaxTokens` to retrieve current settings.
  * - Enter messages via the Serial Monitor to interact with the AI; responses are displayed with error details if applicable.
  * 
@@ -73,20 +73,30 @@ void setup() {
     while(1) delay(1000); // Halt on failure
   }
 
-  // --- Configure the AI Client ---
+  // --- Configure the AI Client's optional parameters ---
   aiClient.setChatSystemRole("You are a helpful assistant.");
   aiClient.setChatTemperature(0.7); // Set creativity/randomness
   aiClient.setChatMaxTokens(150);   // Limit response length
-  
-  // Display configuration settings
-  Serial.println("\nAI Client Configuration:");
+  // You can set optional custom parameters with setChatParameters()
+  // Note that if a parameter is already set by a method above, it will NOT be overwritten
+  if (aiClient.setChatParameters(R"({"top_p":0.95})")){
+    Serial.println("Request Parameters Set Successfully");
+    Serial.print("Custom Parameters: ");
+    Serial.println(aiClient.getChatParameters());
+  } else {
+    Serial.println("Setting Request Parameters Failed");
+    Serial.println("Error details: " + aiClient.getLastError());
+  }  
+
+// Display the configured parameters set by setChatSystemRole/setChatTemperature/setChatMaxTokens
+  Serial.println("\nDisplay the configured parameters set by");
+  Serial.println("\nsetChatSystemRole / setChatTemperature / setChatMaxTokens:");
   Serial.print("System Role: ");
   Serial.println(aiClient.getChatSystemRole());
   Serial.print("Temperature: ");
   Serial.println(aiClient.getChatTemperature());
   Serial.print("Max Tokens: ");
   Serial.println(aiClient.getChatMaxTokens());
-  Serial.println("Ready to chat!");
 }
 
 void loop() {

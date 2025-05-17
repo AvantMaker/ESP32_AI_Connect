@@ -15,7 +15,8 @@ public:
     void setHeaders(HTTPClient& httpClient, const String& apiKey) override;
     String buildRequestBody(const String& modelName, const String& systemRole,
                             float temperature, int maxTokens,
-                            const String& userMessage, JsonDocument& doc) override;
+                            const String& userMessage, JsonDocument& doc,
+                            const String& customParams = "") override;
     String parseResponseBody(const String& responsePayload,
                              String& errorMsg, JsonDocument& doc) override;
 

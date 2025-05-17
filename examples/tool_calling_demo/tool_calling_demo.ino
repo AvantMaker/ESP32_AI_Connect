@@ -47,6 +47,7 @@
 
 // --- Create the API Client Instance ---
 ESP32_AI_Connect aiClient(platform, apiKey, model);
+// Alternatively, you can use a custom endpoint:
 // ESP32_AI_Connect aiClient(platform, apiKey, model, customEndpoint);
 
 void setup() {
@@ -66,7 +67,7 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  // --- Define Tools for Tool Calling ---
+  // --- Define Tool(s) for Tool Calling ---
   const int numTools = 1;
   String myTools[numTools] = {
     R"({
@@ -94,7 +95,7 @@ void setup() {
   }
   Serial.println(F("Tool calling setup successful."));
 
-  // --- Demonstrate Configuration Methods ---
+  // ---  Configuration Methods ---
   aiClient.setTCChatSystemRole("You are a weather assistant.");// Optional: Set system role message
   aiClient.setTCChatMaxTokens(300);        // Optional: Set maximum tokens for the response
   aiClient.setTCChatToolChoice("auto");   // Optional: Set tool choice mode. 

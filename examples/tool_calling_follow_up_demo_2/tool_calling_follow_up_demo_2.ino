@@ -1,18 +1,19 @@
 /*
- * ESP32_AI_Connect - Follow-Up Tool Calls Demonstration
+ * ESP32_AI_Connect - Follow-Up Tool Calls Chatbot
  * 
  * Description:
- * This example demonstrates the complete tool call cycle using the ESP32_AI_Connect library on an ESP32
- * microcontroller over a WiFi network. It shows how to establish a WiFi connection, define and execute two
- * tools (weather lookup and smart home device control) with mock implementations, configure tool calling
- * parameters (system role, max tokens, tool choice), send an initial tool call request, process results, and
- * send them back to the AI for a final response. The demo displays configuration, tool call results, and AI
- * responses on the Serial monitor.
+ * This example demonstrates interactive tool calling with the ESP32_AI_Connect library 
+ * on an ESP32 microcontroller over a WiFi network. It allows users to enter commands via
+ * the Serial monitor to control smart home devices or retrieve weather data using two tools
+ * (weather lookup and device control). The demo features a unique light color control function
+ * that uses AI to convert color descriptions to hex codes, executes mock functions, sends
+ * tool call results back to the AI, and displays configuration, results, and AI responses
+ * on the Serial monitor. Users can repeat commands for convenience.
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 9, 2025
- * Version: 1.0.5
+ * Date: May 11, 2025
+ * Version: 1.0.1
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -25,17 +26,12 @@
  * 1. In `ESP32_AI_Connect_config.h`, set `#define AI_API_REQ_JSON_DOC_SIZE 5120` to support larger tool calls.
  * 2. Create or update `my_info.h` with your WiFi credentials (`ssid`, `password`), API key (`apiKey`),
  *    platform (e.g., "openai"), model (e.g., "gpt-3.5-turbo"), and custom endpoint (`customEndpoint`).
- * 3. Upload the sketch to your ESP32 board and open the Serial Monitor (115200 baud) to view the demo output.
+ * 3. Upload the sketch to your ESP32 board and open the Serial Monitor (115200 baud) to enter commands.
  * 
  * License: MIT License (see LICENSE file in the repository for details)
  * Repository: https://github.com/AvantMaker/ESP32_AI_Connect
  * 
  * Usage Notes:
- * - Modify the `myTools` array or mock functions (`get_weather`, `control_device`) to implement real APIs or devices.
- * - Advanced users can set `setTCChatToolChoice` or `setTCReplyToolChoice` with a JSON object to specify a particular tool.
- * - Check the Serial Monitor for configuration details, tool call results, follow-up responses, and error messages.
- * - The demo supports multiple AI platforms (e.g., OpenAI, Gemini, Anthropic) with varying finish reasons.
- * 
  * Compatibility: Tested with ESP32 DevKitC and DOIT ESP32 DevKit boards using Arduino ESP32 core (version 2.0.0 or later).
  */
 #include <WiFi.h>
@@ -94,13 +90,25 @@ String controlDevice(const String& deviceType, const String& deviceId,
   if (deviceType == "light") {
     if (action == "turn_on") {
       message = "Light " + deviceId + " turned on";
-      if (value.length() > 0) {
-        message += " with brightness set to " + value;
-      }
+      Serial.println("<IMPLEMENT LIGHT ON CONTROL HERE>");
     } else if (action == "turn_off") {
       message = "Light " + deviceId + " turned off";
+      Serial.println("<IMPLEMENT LIGHT OFF CONTROL HERE>");
     } else if (action == "set_brightness") {
       message = "Brightness of light " + deviceId + " set to " + value;
+      Serial.println("<IMPLEMENT LIGHT BRIGHTNESS CONTROL HERE>");
+    } else if (action == "set_color") { 
+      message = "Color of light " + deviceId + " set to " + value;
+      Serial.println("<DEMO LIGHT COLOR CONTROL>");
+      // Here is a demo of light color control with the help of AI LLM communication.
+      aiClient.setChatSystemRole("You are a color code assistant. Based on the user input, you will respond exclusively with a valid hexadecimal color code (in #RRGGBB format) that best matches the described color. Do not include any additional text, explanation, or formatting in your response.");
+      String hexColorCode = aiClient.chat(value);
+      if (isValidHexColor(hexColorCode.c_str())){ // check if LLM response is a valide hex color code
+        setLightColor(deviceId, hexColorCode);
+      } else {
+        status = "error";
+        message = "Failed to set"+ deviceId +" color to" + value;        
+      }
     } else {
       status = "error";
       message = "Unsupported action for light: " + action;
@@ -108,6 +116,7 @@ String controlDevice(const String& deviceType, const String& deviceId,
   } else if (deviceType == "thermostat") {
     if (action == "set_temp") {
       message = "Thermostat " + deviceId + " temperature set to " + value;
+      Serial.println("<IMPLEMENT TEMPERATURE CONTROL HERE>");
     } else {
       status = "error";
       message = "Unsupported action for thermostat: " + action;
@@ -125,8 +134,7 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) { delay(10); } // Wait for Serial Monitor
   delay(1000);
-  Serial.println("--- Tool Calling with Follow-up Demo ---");
-
+  
   // --- Connect to WiFi ---
   Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
@@ -216,21 +224,22 @@ void setup() {
         "\"properties\": {"
           "\"device_type\": {"
             "\"type\": \"string\","
-            "\"enum\": [\"light\", \"thermostat\", \"fan\", \"door\"],"
+            "\"enum\": [\"light\", \"thermostat\"],"
             "\"description\": \"The type of device to control\""
           "},"
           "\"device_id\": {"
             "\"type\": \"string\","
+            "\"enum\": [\"living_room_light\", \"kitchen_light\", \"bedroom_light\", \"thermostat\"],"
             "\"description\": \"The identifier for the specific device\""
           "},"
           "\"action\": {"
             "\"type\": \"string\","
-            "\"enum\": [\"turn_on\", \"turn_off\", \"set_temp\", \"set_brightness\", \"set_color\", \"set_speed\", \"open\", \"close\"],"
+            "\"enum\": [\"turn_on\", \"turn_off\", \"set_temp\", \"set_brightness\", \"set_color\", \"set_speed\"],"
             "\"description\": \"The action to perform on the device\""
           "},"
           "\"value\": {"
             "\"type\": \"string\","
-            "\"description\": \"The value for the action (e.g., temperature, brightness level, color, speed)\""
+            "\"description\": \"The value for the action (e.g., temperature, brightness, level, color, speed)\""
           "}"
         "},"
         "\"required\": [\"device_type\", \"device_id\", \"action\"]"
@@ -249,25 +258,59 @@ void setup() {
   }
   Serial.println("Tool calling setup successful.");
 
-  // --- Demonstrate Configuration Methods for initial tool calls request ---
+  // --- Configure the AI Client's optional parameters ---
   aiClient.setTCChatSystemRole("You can get weather info. and control smart devices based on the input functions."); // Optional: Set system role message
-  aiClient.setTCChatMaxTokens(365);      // Optional: Set maximum tokens for the response
+  //aiClient.setTCChatMaxTokens(365);      // Optional: Set maximum tokens for the response
   aiClient.setTCChatToolChoice("auto"); // Optional: Set tool choice mode.
   // ↓ You can also use json string to set tool_choice. Just use the    ↓
   // ↓ right format as the following and make sure the platform and llm ↓
   // ↓ supports this.↓                                                  ↓
-  // aiClient.setTCChatToolChoice(R"({"type": "function","function": {"name": "control_device"}})"); // <- OpenAI/Gemini Supports this format
-  // aiClient.setTCChatToolChoice(R"({"type": "tool", "name": "control_device"})"); // <- Claude Supports this format
+  // aiClient.setTCChatToolChoice(R"({\"type\": \"function\",\"function\": {\"name\": \"control_device\"}})"); // <- OpenAI/Gemini Supports this format
+  // aiClient.setTCChatToolChoice(R"({\"type\": \"tool\", \"name\": \"control_device\"})"); // <- Claude Supports this format
   
   Serial.println("\n---Initial Tool Call Configuration ---");
   Serial.println("System Role: " + aiClient.getTCChatSystemRole());
   Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
   Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
 
-  // --- Initial prompt that will likely require tool calls ---
-  String userMessage = "I want to turn on the living room lights.";
-  // String userMessage = "Check the weather in Paris."; // Test prompt to use the other tool
-  runToolCallsDemo(userMessage);
+  Serial.println("\n--- AvantMaker ESP32_AI_Connect Assistant Started ---");
+  Serial.println("Enter your commands below:");
+  Serial.println("Command Example-1: Turn Off kitchen Light");
+  Serial.println("Command Example-2: Check weather condition in Toronto");
+  Serial.println("Command Example-3: Set the living room light to warm color.");
+  
+}
+
+// New loop function to handle user input
+void loop() {
+  static String lastCommand; // Store last command to allow repeating it
+  
+  // Check if there's input available from Serial Monitor
+  if (Serial.available() > 0) {
+    // Read the entire line from Serial input
+    String userMessage = Serial.readStringUntil('\n');
+    userMessage.trim(); // Remove leading/trailing whitespace and newline characters
+    
+    // Handle special commands
+    if (userMessage.length() == 0) {
+      if (lastCommand.length() > 0) {
+        Serial.println("Repeating last command: '" + lastCommand + "'");
+        userMessage = lastCommand; // Use last command if user sent a blank line
+      } else {
+        Serial.println("No previous command to repeat. Enter a command or 'exit' to quit.");
+        return;
+      }
+    } else {
+      // Save non-empty command as last command
+      lastCommand = userMessage;
+    }
+    
+    // Process the user's message
+    if (userMessage.length() > 0) {
+      Serial.println("Processing command: '" + userMessage + "'");
+      runToolCallsDemo(userMessage);
+    }
+  }
 }
 
 void runToolCallsDemo(String userMessage) {
@@ -375,13 +418,13 @@ void runToolCallsDemo(String userMessage) {
     String toolResultsJson;
     serializeJson(toolResults, toolResultsJson);
 
-    // --- Demonstrate Optional Configuration Methods for follow-up tool calls request ---
-    // Config the token limit (as max_completion_tokens for OpenAI, max_tokens for Claude) and tool_choice in the follow-up
+    // --- Demonstrate Configuration Methods for follow-up tool calls request ---
+    // Config the max_completion_tokens and tool_choice in the follow-up
     // request. These parameters are independent of the parameters 
     // set in the initial request. 
 
-    aiClient.setTCReplyMaxTokens(900); // (Optional) Maximum tokens for the follow-up response
-    aiClient.setTCReplyToolChoice("auto"); // (Optional) Tool choice for the follow-up (can be 
+    aiClient.setTCReplyMaxTokens(900);
+    aiClient.setTCReplyToolChoice("auto");
     
     Serial.println("\n---Follow-Up Tool Call Configuration ---");
     Serial.println("Follow-Up Max Tokens: " + String(aiClient.getTCReplyMaxTokens()));
@@ -412,7 +455,7 @@ void runToolCallsDemo(String userMessage) {
     Serial.println("\n--- AI RESPONSE TO TOOL RESULTS ---");
     Serial.println("Finish reason: " + finishReason);
     
-    if (finishReason == "tool_calls" || finishReason == "tool_use") {
+    if (finishReason == "tool_calls") {
       // More tool calls requested - could implement nested calls here
       Serial.println("AI requested more tool calls: " + followUpResult);
       Serial.println("(This example doesn't handle multiple rounds of tool calls)");
@@ -454,6 +497,26 @@ void runToolCallsDemo(String userMessage) {
   Serial.println("Demo completed");
 }
 
-void loop() {
-  // Nothing to do in the loop for this demo
+// Mock Function for set light color
+void setLightColor(String  deviceId, String  hexColorCode){
+  Serial.println("Set " + deviceId + " Color to " + hexColorCode);
+  Serial.println("Mocking Light Control Opertion.");
+  Serial.println(deviceId + " color has been set to " + hexColorCode);
+}
+
+// Function to Validate Hex Color Code 
+boolean isValidHexColor(const char* str) {
+  if (str == NULL || strlen(str) != 4 && strlen(str) != 7) return false;
+  if (str[0] != '#') return false;
+
+  int len = strlen(str);
+  for (int i = 1; i < len; i++) {
+    char c = toupper(str[i]);
+    if (!(c >= '0' && c <= '9') &&
+        !(c >= 'A' && c <= 'F')) {
+      return false;
+    }
+  }
+
+  return true;
 }

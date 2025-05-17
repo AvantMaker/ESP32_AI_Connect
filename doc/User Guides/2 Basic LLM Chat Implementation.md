@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 2 Basic LLM Chat Implementation
-> **Version 0.0.3** • Revised: May 10, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Version 0.0.5** • Revised: May 15, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 
 ## Overview
 
@@ -101,11 +101,33 @@ After establishing the WiFi connection, we configure the AI client with specific
 These configuration options allow you to customize the behavior of the AI:
 
 - `setChatTemperature(0.7)`: Controls the randomness/creativity of the responses. Lower values (closer to 0) make responses more deterministic and focused, while higher values (up to 2.0) make them more creative and diverse.
-- `setChatMaxTokens(200)`: Limits the maximum length of the AI's response in tokens (roughly 4 characters per token). This helps control response size and API costs.
+- `setChatMaxTokens(200)`: Sets the maximum number of tokens in the AI's response. This helps regulate response length and manage API costs. Each AI platform handles this parameter slightly differently: OpenAI uses `max_completion_tokens`, Claude uses `max_tokens`, and Gemini uses `maxOutputTokens`. The library automatically adapts to each platform, ensuring compatibility and seamless interaction regardless of which AI provider you choose.
 - `setChatSystemRole("You are a helpful assistant")`: Sets the system message that defines the AI's behavior and personality.
 
 **Note: The parameters set by the above methods are optional. If you do not explicitly configure these parameters, the LLM will use its default values for temperature, max tokens, and system role.**
 
+### Additional Parameter Configuration Methods
+
+The library also provides methods for setting and retrieving custom parameters that are specific to each AI platform:
+
+- `setChatParameters()`: Allows you to set custom parameters in JSON format that are specific to the AI platform you're using. These parameters can include platform-specific options like `top_p`, `presence_penalty`, or any other parameters supported by the platform.
+- `getChatParameters()`: Retrieves the currently set custom parameters.
+
+These methods are demonstrated in the `basic_llm_chat.ino` example in the examples folder. If you need to use platform-specific parameters or want to see how to implement these methods, please refer to that example.
+
+**Important Note**: When using `setChatParameters()`, be aware that:
+1. The parameters must be provided in valid JSON format
+2. If a parameter is already set by a specific method (like `setChatTemperature()`), the value from the specific method will take precedence
+3. The exact parameters available depend on the AI platform you're using
+
+For example, in `basic_llm_chat.ino`, you can see how to use these methods:
+```cpp
+// Set custom parameters
+aiClient.setChatParameters(R"({"top_p":0.95})");
+
+// Get current parameters
+String currentParams = aiClient.getChatParameters();
+```
 
 ## Step 6: Verifying Configuration with Getter Methods
 

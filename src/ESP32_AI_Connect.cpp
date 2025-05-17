@@ -114,6 +114,34 @@ int ESP32_AI_Connect::getChatMaxTokens() const {
     return _maxTokens;
 }
 
+// --- Custom Parameters Methods ---
+// Sets custom parameters for standard chat requests in JSON format
+bool ESP32_AI_Connect::setChatParameters(String userParameterJsonStr) {
+    // If empty string, clear the parameters
+    if (userParameterJsonStr.isEmpty()) {
+        _chatCustomParams = "";
+        return true;
+    }
+    
+    // Validate JSON format
+    DynamicJsonDocument tempDoc(512); // Temporary document for validation
+    DeserializationError error = deserializeJson(tempDoc, userParameterJsonStr);
+    
+    if (error) {
+        _lastError = "Invalid JSON in custom parameters: " + String(error.c_str());
+        return false;
+    }
+    
+    // Store validated JSON string
+    _chatCustomParams = userParameterJsonStr;
+    return true;
+}
+
+// Returns the current custom parameters set for standard chat requests
+String ESP32_AI_Connect::getChatParameters() const {
+    return _chatCustomParams;
+}
+
 // --- Raw Response Access Methods ---
 String ESP32_AI_Connect::getChatRawResponse() const {
     return _chatRawResponse;
@@ -123,12 +151,29 @@ String ESP32_AI_Connect::getTCRawResponse() const {
     return _tcRawResponse;
 }
 
+// Returns the HTTP response code from the last chat request
+int ESP32_AI_Connect::getChatResponseCode() const {
+    return _chatResponseCode;
+}
+
+// Returns the HTTP response code from the last tcChat request
+int ESP32_AI_Connect::getTCChatResponseCode() const {
+    return _tcChatResponseCode;
+}
+
+// Returns the HTTP response code from the last tcReply request
+int ESP32_AI_Connect::getTCReplyResponseCode() const {
+    return _tcReplyResponseCode;
+}
+
 // --- Reset Methods ---
 void ESP32_AI_Connect::chatReset() {
     _chatRawResponse = "";
+    _chatResponseCode = 0;     // Reset the stored HTTP response code
     _systemRole = "";     // Reset system role set by setChatSystemRole
     _temperature = -1.0;  // Reset temperature set by setChatTemperature to API default
     _maxTokens = -1;      // Reset max tokens set by setChatMaxTokens to API default
+    _chatCustomParams = ""; // Reset custom parameters to empty string
 }
 
 // --- Get Last Error ---
@@ -294,6 +339,8 @@ void ESP32_AI_Connect::tcChatReset() {
     _lastAssistantToolCallsJson = "";
     _lastMessageWasToolCalls = false;
     _tcRawResponse = ""; // Clear the raw tool calling response
+    _tcChatResponseCode = 0; // Reset the stored tcChat HTTP response code
+    _tcReplyResponseCode = 0; // Reset the stored tcReply HTTP response code
     
     // Reset but don't delete tool definitions
     // If users want to clear tools, they need to call setTCTools with empty array
@@ -312,6 +359,7 @@ void ESP32_AI_Connect::tcChatReset() {
 String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
     _lastError = "";
     _tcRawResponse = ""; // Clear previous raw response
+    _tcChatResponseCode = 0; // Reset response code
     
     // Check if platform handler is initialized
     if (!_platformHandler) {
@@ -360,6 +408,9 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
         _platformHandler->setHeaders(_httpClient, _apiKey); // Same headers as regular chat
         _httpClient.setTimeout(AI_API_HTTP_TIMEOUT_MS);
         int httpCode = _httpClient.POST(requestBody);
+        
+        // Store the HTTP response code
+        _tcChatResponseCode = httpCode;
         
         // Handle Response
         if (httpCode > 0) {
@@ -412,6 +463,7 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
 String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
     _lastError = "";
     _tcRawResponse = ""; // Clear previous raw response
+    _tcReplyResponseCode = 0; // Reset response code
     
     // Check if platform handler is initialized
     if (!_platformHandler) {
@@ -508,6 +560,9 @@ String ESP32_AI_Connect::tcReply(const String& toolResultsJson) {
         _httpClient.setTimeout(AI_API_HTTP_TIMEOUT_MS);
         int httpCode = _httpClient.POST(requestBody);
         
+        // Store the HTTP response code
+        _tcReplyResponseCode = httpCode;
+        
         // Handle Response
         if (httpCode > 0) {
             String responsePayload = _httpClient.getString();
@@ -564,6 +619,7 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
     _lastError = "";
     String responseContent = "";
     _chatRawResponse = ""; // Clear previous raw response
+    _chatResponseCode = 0; // Reset response code
 
     if (!_platformHandler) {
         _lastError = "Platform handler not initialized. Call begin() with a supported platform.";
@@ -578,10 +634,10 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
     }
 
     // Build request body using handler and shared JSON doc
-    // Using values set by setChatSystemRole, setChatTemperature, and setChatMaxTokens
+    // Using values set by setChatSystemRole, setChatTemperature, setChatMaxTokens, and setChatParameters
     String requestBody = _platformHandler->buildRequestBody(_modelName, _systemRole,
                                                             _temperature, _maxTokens,
-                                                            userMessage, _reqDoc);
+                                                            userMessage, _reqDoc, _chatCustomParams);
     if (requestBody.isEmpty()) {
         // Assume handler sets _lastError or check its return value pattern if defined
         if (_lastError.isEmpty()) _lastError = "Failed to build request body (handler returned empty).";
@@ -603,6 +659,9 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
         _platformHandler->setHeaders(_httpClient, _apiKey); // Set headers via handler
         _httpClient.setTimeout(AI_API_HTTP_TIMEOUT_MS); // Use configured timeout
         int httpCode = _httpClient.POST(requestBody);
+        
+        // Store the HTTP response code
+        _chatResponseCode = httpCode;
 
         // --- Handle Response ---
         if (httpCode > 0) {

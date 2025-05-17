@@ -28,12 +28,32 @@ void AI_API_Claude_Handler::setHeaders(HTTPClient& httpClient, const String& api
 // Build request body for Claude API
 String AI_API_Claude_Handler::buildRequestBody(const String& modelName, const String& systemRole,
                                              float temperature, int maxTokens,
-                                             const String& userMessage, JsonDocument& doc) {
+                                             const String& userMessage, JsonDocument& doc,
+                                             const String& customParams) {
     try {
         // Set the model
         doc["model"] = modelName;
         
-        // Add optional parameters
+        // Process custom parameters if provided
+        if (customParams.length() > 0) {
+            // Create a temporary document to parse the custom parameters
+            DynamicJsonDocument paramsDoc(512);
+            DeserializationError error = deserializeJson(paramsDoc, customParams);
+            
+            // Only proceed if parsing was successful
+            if (!error) {
+                // Add each parameter from customParams to the request
+                for (JsonPair param : paramsDoc.as<JsonObject>()) {
+                    // Skip model, messages, system as they are handled separately
+                    if (param.key() != "model" && param.key() != "messages" && param.key() != "system") {
+                        // Copy the parameter to our request document
+                        doc[param.key()] = param.value();
+                    }
+                }
+            }
+        }
+        
+        // Add optional parameters (these override any custom parameters)
         if (temperature >= 0) {
             doc["temperature"] = temperature;
         }

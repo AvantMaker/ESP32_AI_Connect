@@ -11,8 +11,8 @@
  * 
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 9, 2025
- * Version: 1.0.3
+ * Date: May 12, 2025
+ * Version: 1.0.5
  * 
  * Hardware Requirements:
  * - ESP32-based microcontroller (e.g., ESP32 DevKitC, DOIT ESP32 DevKit)
@@ -200,7 +200,7 @@ void setup() {
   Serial.println("System Role: " + aiClient.getTCChatSystemRole());
   Serial.println("Max Tokens: " + String(aiClient.getTCChatMaxTokens()));
   Serial.println("Tool Choice: " + aiClient.getTCChatToolChoice());
-  Serial.println("Tool Choice: " + aiClient.getTCRawResponse());
+  Serial.println("AI Raw Response: " + aiClient.getTCRawResponse());
 
   Serial.println("\n--------------------");
   Serial.println("Demo finished. Restart device to run again.");
