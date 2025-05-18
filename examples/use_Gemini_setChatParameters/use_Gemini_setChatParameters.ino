@@ -2,8 +2,8 @@
  * ESP32_AI_Connect - Gemini setChatParameters Demo
  * Author: AvantMaker <admin@avantmaker.com>
  * Author Website: https://www.AvantMaker.com
- * Date: May 15, 2025
- * Version: 1.0.1
+ * Date: May 18, 2025
+ * Version: 1.0.2
  *
  * Description:
  * This example demonstrates how to use the ESP32_AI_Connect library to interact with the Google Gemini AI
@@ -45,7 +45,7 @@
 const char* ssid = "your_SSID";          // Replace with your Wi-Fi SSID
 const char* password = "your_PASSWORD";  // Replace with your Wi-Fi password
 
-const char* apiKey = "AIzaSyDS1R28p6uNzDz2jCAPEGSLYyJM1xVxM0s";  // Replace with your key
+const char* apiKey = "your_API_Key";         // Replace with your key
 const char* model = "gemini-2.0-flash";      // Replace with your model
 const char* platform = "gemini";      
 

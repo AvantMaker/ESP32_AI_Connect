@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 3 Tool Calls Implementation Basics
-> **Version 0.0.5** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Version 0.0.6** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Overview
 
 This guide will walk you through the process of setting up and using tool calls (tool calling) with Large Language Models (LLMs) using the ESP32_AI_Connect library. We'll use the `tool_calling_demo.ino` sketch stored in the examples folder as our reference implementation, explaining each component in detail so you can understand how to integrate AI tool calling capabilities into your ESP32 projects with ESP32_AI_Connect.
@@ -22,7 +22,7 @@ First, ensure that tool calls support is enabled in the library configuration fi
 ```cpp
 // --- Tool Calls Support ---
 // Uncomment the following line to enable tool calls (tool calling) support
-// This will add tcToolSetup and tcChat methods to the library
+// This will add tool calling methods to the library
 // If you don't need tool calls, keep this commented out to save memory
 #define ENABLE_TOOL_CALLS
 ```
@@ -125,7 +125,7 @@ After defining your tools, you need to set up the tool calling configuration:
 ```cpp
 // --- Setup Tool Calling ---
 Serial.println("Setting up tool calling configuration...");
-if (!aiClient.tcToolSetup(myTools, numTools)) {
+if (!aiClient.setTCTools(myTools, numTools)) {
   Serial.println(F("Failed to set up tool calling!"));
   Serial.println("Error: " + aiClient.getLastError());
   while(1) { delay(1000); } // Halt on failure
@@ -133,7 +133,7 @@ if (!aiClient.tcToolSetup(myTools, numTools)) {
 Serial.println(F("Tool calling setup successful."));
 ```
 
-The `tcToolSetup` method takes the array of tool definitions and its size. This sets up the basic configuration for tool calling.
+The `setTCTools` method takes the array of tool definitions and its size. This sets up the basic configuration for tool calling.
 
 ## Step 7: Configure Tool Calling Parameters (Optional)
 
