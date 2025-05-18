@@ -44,11 +44,11 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 
 | Platform          | Identifier           | Example Models                  | Tool Calls Support | Streaming Support |
 |-------------------|----------------------|---------------------------------|-------------------|-------------------|
-| OpenAI            | `"openai"`           | gpt-3.5, gpt-4           | Yes               | Under Development               |
-| Google Gemini     | `"gemini"`           | gemini-2.0-flash, gemini-2.5                | Yes                | Under Development               |
-| DeepSeek          | `"deepseek"`         | deepseek-chat                   | Yes               | Under Development                |
+| OpenAI            | `"openai"`           | gpt-3.5, gpt-4, etc.           | Yes               | Under Development               |
+| Google Gemini     | `"gemini"`           | gemini-2.0-flash, gemini-2.5, etc.                | Yes                | Under Development               |
+| DeepSeek          | `"deepseek"`         | deepseek-chat, etc.                   | Yes               | Under Development                |
 | Anthropic Claude | `"claude"`| claude-3.7-sonnet, claude-3.5-haiku, etc.               | Yes               | Under Development                |
-| OpenAI Compatible | `"openai-compatible"`| HuggingFace, Qwen, etc.                       | See Note 1 below               | Under Development               |
+| OpenAI Compatible | `"openai-compatible"`| HuggingFace, OpenRouter, etc.                       | See Note 1 below               | Under Development               |
 
 **Note 1:** Tool call support differs by platform and model, so the availability of the `tool_calls` feature on the OpenAI Compatible platform depends on your chosen platform and model.
 
@@ -148,7 +148,7 @@ void loop() {
 ```
 
 ## Tool Calls (Tool Calling) Support
-Tool calls (a.k.a. talling calling) enable the AI model to request specific actions from your ESP32 application. This feature allows:
+Tool calls (a.k.a. tool calling or tool use) enable the AI model to request specific actions from your ESP32 application. This feature allows:
 
 - Two-way interaction : AI can request data or actions from your device
 - Structured data exchange : Receive properly formatted JSON for easy parsing
