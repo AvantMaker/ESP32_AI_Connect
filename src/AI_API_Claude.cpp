@@ -720,3 +720,176 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
     }
 }
 #endif // ENABLE_TOOL_CALLS
+
+#ifdef ENABLE_STREAM_CHAT
+String AI_API_Claude_Handler::buildStreamRequestBody(const String& modelName, const String& systemRole,
+                                                    float temperature, int maxTokens,
+                                                    const String& userMessage, JsonDocument& doc,
+                                                    const String& customParams) {
+    try {
+        // Use the same logic as buildRequestBody but add "stream": true
+        
+        // Set the model
+        doc["model"] = modelName;
+        
+        // Enable streaming
+        doc["stream"] = true;
+        
+        // Process custom parameters if provided
+        if (customParams.length() > 0) {
+            // Create a temporary document to parse the custom parameters
+            DynamicJsonDocument paramsDoc(512);
+            DeserializationError error = deserializeJson(paramsDoc, customParams);
+            
+            // Only proceed if parsing was successful
+            if (!error) {
+                // Add each parameter from customParams to the request (skip conflicting ones)
+                for (JsonPair param : paramsDoc.as<JsonObject>()) {
+                    // Skip model, messages, system, stream as they are handled separately
+                    if (param.key() != "model" && param.key() != "messages" && 
+                        param.key() != "system" && param.key() != "stream") {
+                        doc[param.key()] = param.value();
+                    }
+                }
+            }
+        }
+        
+        // Add optional parameters (these override any custom parameters)
+        if (temperature >= 0) {
+            doc["temperature"] = temperature;
+        }
+        
+        if (maxTokens > 0) {
+            doc["max_tokens"] = maxTokens;
+        }
+        
+        // Add system message if specified
+        if (systemRole.length() > 0) {
+            doc["system"] = systemRole;
+        }
+        
+        // Create messages array with user message
+        JsonArray messages = doc.createNestedArray("messages");
+        JsonObject userMsg = messages.createNestedObject();
+        userMsg["role"] = "user";
+        userMsg["content"] = userMessage;
+        
+        // Serialize the request body
+        String requestBody;
+        serializeJson(doc, requestBody);
+        return requestBody;
+    } 
+    catch (const std::exception& e) {
+        return "";
+    }
+}
+
+String AI_API_Claude_Handler::processStreamChunk(const String& rawChunk, bool& isComplete, String& errorMsg) {
+    resetState(); // Reset state for each chunk
+    isComplete = false;
+    errorMsg = "";
+
+    // Claude streaming uses Server-Sent Events format
+    // Format: "event: event_type\ndata: {json}\n" or just "data: {json}\n"
+    
+    if (rawChunk.isEmpty()) {
+        return "";
+    }
+
+    // Look for "data: " prefix (standard SSE format)
+    int dataIndex = rawChunk.indexOf("data: ");
+    if (dataIndex == -1) {
+        // Not a data line, might be event line or empty line, skip
+        return "";
+    }
+
+    // Extract JSON part after "data: "
+    String jsonPart = rawChunk.substring(dataIndex + 6); // 6 = length of "data: "
+    jsonPart.trim(); // Remove any whitespace
+
+    if (jsonPart.isEmpty()) {
+        return "";
+    }
+
+    // Parse the JSON chunk
+    DynamicJsonDocument chunkDoc(1024); // Larger buffer for Claude responses
+    DeserializationError error = deserializeJson(chunkDoc, jsonPart);
+    if (error) {
+        errorMsg = "Failed to parse Claude streaming chunk JSON: " + String(error.c_str());
+        return "";
+    }
+
+    // Check for error in the chunk
+    if (chunkDoc.containsKey("error")) {
+        errorMsg = String("API Error in stream: ") + (chunkDoc["error"]["message"] | "Unknown error");
+        return "";
+    }
+
+    // Extract the event type
+    String eventType = "";
+    if (chunkDoc.containsKey("type")) {
+        eventType = chunkDoc["type"].as<String>();
+    }
+
+    // Handle different event types according to Claude's streaming documentation
+    if (eventType == "message_start") {
+        // Beginning of message - no content yet
+        return "";
+    }
+    else if (eventType == "content_block_start") {
+        // Start of a content block - no content yet
+        return "";
+    }
+    else if (eventType == "content_block_delta") {
+        // This contains the actual content chunks we want
+        if (chunkDoc.containsKey("delta")) {
+            JsonObject delta = chunkDoc["delta"];
+            
+            // Check if this is a text delta
+            if (delta.containsKey("type") && delta["type"] == "text_delta") {
+                if (delta.containsKey("text")) {
+                    return delta["text"].as<String>();
+                }
+            }
+        }
+        return "";
+    }
+    else if (eventType == "content_block_stop") {
+        // End of a content block - no content
+        return "";
+    }
+    else if (eventType == "message_delta") {
+        // Message-level changes, check for stop_reason
+        if (chunkDoc.containsKey("delta")) {
+            JsonObject delta = chunkDoc["delta"];
+            if (delta.containsKey("stop_reason")) {
+                _lastFinishReason = delta["stop_reason"].as<String>();
+            }
+        }
+        return "";
+    }
+    else if (eventType == "message_stop") {
+        // End of message
+        isComplete = true;
+        return "";
+    }
+    else if (eventType == "ping") {
+        // Keep-alive ping - ignore
+        return "";
+    }
+    else if (eventType == "error") {
+        // Error event
+        if (chunkDoc.containsKey("error")) {
+            JsonObject errorObj = chunkDoc["error"];
+            errorMsg = String("Stream error: ") + (errorObj["message"] | "Unknown error");
+        } else {
+            errorMsg = "Unknown stream error";
+        }
+        return "";
+    }
+
+    // If we reach here, it might be an unrecognized event type
+    // Just ignore it and continue
+    return "";
+}
+#endif // ENABLE_STREAM_CHAT

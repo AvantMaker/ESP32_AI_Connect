@@ -20,6 +20,15 @@ public:
     String parseResponseBody(const String& responsePayload,
                              String& errorMsg, JsonDocument& doc) override;
 
+#ifdef ENABLE_STREAM_CHAT
+    // --- Streaming Chat Methods (Override virtual methods from base class) ---
+    String buildStreamRequestBody(const String& modelName, const String& systemRole,
+                                 float temperature, int maxTokens,
+                                 const String& userMessage, JsonDocument& doc,
+                                 const String& customParams = "") override;
+    String processStreamChunk(const String& rawChunk, bool& isComplete, String& errorMsg) override;
+#endif
+
 #ifdef ENABLE_TOOL_CALLS
     // --- Tool Calls Methods (Override virtual methods from base class) ---
     String buildToolCallsRequestBody(const String& modelName,

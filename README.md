@@ -4,6 +4,8 @@
 [![Platform](https://img.shields.io/badge/Platform-ESP32-blue.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![Language](https://img.shields.io/badge/Language-Arduino-teal.svg)](https://www.arduino.cc/)
 [![AvantMaker](https://img.shields.io/badge/By-AvantMaker-red.svg)](https://www.avantmaker.com)
+---
+> README Version 0.0.5 • Revised: May 26, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 
 This project is proudly brought to you by the team at **AvantMaker.com**.
 
@@ -27,6 +29,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 
 - **Multi-platform support**: Single interface for different AI providers
 - **Tool calls support**: Enables tool call capabilities with AI models
+- **Streaming support**: Supports streaming communication with AI model, featuring thread safety, user interruption, etc.
 - **Expandable framework**: Built to easily accommodate additional model support
 - **Configurable features**: Enable/disable tool calls feature to optimize microcontroller resources
 - **OpenAI-compatible support**: Use alternative platforms by supplying custom endpoints and model names
@@ -44,20 +47,20 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 
 | Platform          | Identifier           | Example Models                  | Tool Calls Support | Streaming Support |
 |-------------------|----------------------|---------------------------------|-------------------|-------------------|
-| OpenAI            | `"openai"`           | gpt-3.5, gpt-4, etc.           | Yes               | Under Development               |
-| Google Gemini     | `"gemini"`           | gemini-2.0-flash, gemini-2.5, etc.                | Yes                | Under Development               |
-| DeepSeek          | `"deepseek"`         | deepseek-chat, etc.                   | Yes               | Under Development                |
-| Anthropic Claude | `"claude"`| claude-3.7-sonnet, claude-3.5-haiku, etc.               | Yes               | Under Development                |
-| OpenAI Compatible | `"openai-compatible"`| HuggingFace, OpenRouter, etc.                       | See Note 1 below               | Under Development               |
+| OpenAI            | `"openai"`           | gpt-3.5, gpt-4, etc.           | Yes               | Yes               |
+| Google Gemini     | `"gemini"`           | gemini-2.0-flash, gemini-2.5, etc.                | Yes                | Yes               |
+| DeepSeek          | `"deepseek"`         | deepseek-chat, etc.                   | Yes               | Yes                |
+| Anthropic Claude | `"claude"`| claude-3.7-sonnet, claude-3.5-haiku, etc.               | Yes               | Yes                |
+| OpenAI Compatible | `"openai-compatible"`| HuggingFace, OpenRouter, etc.                       | See Note 1 below               | See Note 1 below               |
 
-**Note 1:** Tool call support differs by platform and model, so the availability of the `tool_calls` feature on the OpenAI Compatible platform depends on your chosen platform and model.
+**Note 1:** Tool calls and Streaming support differ by AI platform and LLM model, so the availability of the `tool_calls` and `streaming` feature on the OpenAI Compatible platform depends on your chosen platform and model.
 
 **Note 2:** We are actively working to add Grok and Ollama to the list of supported platforms.
 
 
 ## Dependency
 
-The **ESP32_AI_connect** library depends on the **ArduinoJson** library (version 7.0.0 or higher) to function properly. For more details about the ArduinoJson library, please visit its official website: [https://arduinojson.org/](https://arduinojson.org/)
+The **ESP32_AI_Connect** library depends on the **ArduinoJson** library (version 7.0.0 or higher) to function properly. For more details about the ArduinoJson library, please visit its official website: [https://arduinojson.org/](https://arduinojson.org/)
 
 ## Installation
 
@@ -157,6 +160,18 @@ Tool calls (a.k.a. tool calling or tool use) enable the AI model to request spec
 - Context preservation : Maintain conversation context throughout tool interactions
 This capability is ideal for creating more sophisticated applications where the AI needs to access sensor data, control hardware, or perform calculations using your ESP32.
 
+## Streaming Chat Support
+Streaming chat enables real-time interaction with AI models by delivering responses as they are generated, creating a more natural and engaging user experience. This feature allows:
+
+- **Real-time Response**: See AI responses as they are generated, word by word
+- **Interactive Experience**: More natural, conversation-like interaction
+- **Immediate Feedback**: Get instant responses without waiting for complete generation
+- **User Control**: Interrupt or stop responses at any time
+- **Performance Metrics**: Monitor streaming performance with detailed statistics
+- **Multi-platform Support**: Works with OpenAI, Claude, Gemini, DeepSeek, and Open-Compatible platforms
+- **Thread-safe Design**: Built on FreeRTOS primitives for reliable operation
+- **Memory Efficient**: Optimized for ESP32's limited resources
+
 ## User Guide
 
 For detailed instructions on how to use this library, please refer to the comprehensive User Guide documents in the `doc/User Guide` folder. The User Guide includes:
@@ -177,10 +192,12 @@ Edit ESP32_AI_Connect_config.h to customize the library to your specific needs:
 #define USE_AI_API_OPENAI
 #define USE_AI_API_GEMINI
 #define USE_AI_API_DEEPSEEK
+#define USE_AI_API_CLAUDE
 
 // Feature toggles - disable to save resources
 #define ENABLE_TOOL_CALLS     // Enable/disable tool calls support
 #define ENABLE_DEBUG_OUTPUT   // Enable/disable debug messages
+#define ENABLE_STREAM_CHAT   // // Enable/disable streaming support
 
 // Memory allocation
 #define AI_API_REQ_JSON_DOC_SIZE 1024

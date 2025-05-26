@@ -44,6 +44,17 @@ public:
                                JsonDocument& doc) override;
 #endif
 
+#ifdef ENABLE_STREAM_CHAT
+    // Streaming chat methods
+    String getStreamEndpoint(const String& modelName, const String& apiKey, const String& customEndpoint = "") const override;
+    String buildStreamRequestBody(const String& modelName, const String& systemRole,
+                                float temperature, int maxTokens,
+                                const String& userMessage, JsonDocument& doc,
+                                const String& customParams = "") override;
+                                
+    String processStreamChunk(const String& rawChunk, bool& isComplete, String& errorMsg) override;
+#endif
+
     // Add Gemini-specific methods here if needed
 private:
     int _totalTokens = 0;  // Store the total tokens from the last response

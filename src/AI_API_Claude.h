@@ -40,6 +40,16 @@ public:
                                        const String& followUpToolChoice,
                                        JsonDocument& doc) override;
 #endif
+
+#ifdef ENABLE_STREAM_CHAT
+    // Streaming chat methods
+    String buildStreamRequestBody(const String& modelName, const String& systemRole,
+                                float temperature, int maxTokens,
+                                const String& userMessage, JsonDocument& doc,
+                                const String& customParams = "") override;
+                                
+    String processStreamChunk(const String& rawChunk, bool& isComplete, String& errorMsg) override;
+#endif
                             
 private:
     // Claude API version - can be updated if needed

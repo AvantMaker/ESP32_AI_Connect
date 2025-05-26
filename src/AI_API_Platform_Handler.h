@@ -7,7 +7,7 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 
-// Include configuration to get access to ENABLE_TOOL_CALLS flag
+// Include configuration to get access to ENABLE_TOOL_CALLS and ENABLE_STREAM_CHAT flags
 #include "ESP32_AI_Connect_config.h"
 
 // Forward declaration
@@ -91,6 +91,31 @@ public:
                                        int followUpMaxTokens,
                                        const String& followUpToolChoice,
                                        JsonDocument& doc) { return ""; }
+#endif
+
+#ifdef ENABLE_STREAM_CHAT
+    // --- Streaming Chat Methods ---
+    
+    // Get the streaming-specific API endpoint URL (if different from regular endpoint)
+    // Default implementation uses the same endpoint as regular requests
+    virtual String getStreamEndpoint(const String& modelName, const String& apiKey, const String& customEndpoint = "") const {
+        return getEndpoint(modelName, apiKey, customEndpoint);
+    }
+    
+    // Build streaming request body (similar to buildRequestBody but with stream:true)
+    // Takes user message, config params, and a JsonDocument reference to populate
+    // Returns the serialized JSON string or empty string on error
+    virtual String buildStreamRequestBody(const String& modelName, const String& systemRole,
+                                        float temperature, int maxTokens,
+                                        const String& userMessage, JsonDocument& doc,
+                                        const String& customParams = "") { return ""; }
+
+    // Process a single stream chunk and extract content
+    // Takes raw chunk data from HTTP stream
+    // Returns: extracted content from chunk, empty if no content or error
+    // Sets isComplete to true if this is the final chunk
+    // Sets errorMsg if there's an error processing the chunk
+    virtual String processStreamChunk(const String& rawChunk, bool& isComplete, String& errorMsg) { return ""; }
 #endif
 
     // --- Optional Platform-Specific Methods ---

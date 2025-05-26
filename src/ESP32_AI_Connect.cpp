@@ -4,6 +4,15 @@
 ESP32_AI_Connect::ESP32_AI_Connect(const char* platformIdentifier, const char* apiKey, const char* modelName) {
     // Set insecure client - consider making this configurable
     _wifiClient.setInsecure();
+    
+#ifdef ENABLE_STREAM_CHAT
+    // Initialize FreeRTOS mutex for thread safety
+    _streamMutex = xSemaphoreCreateMutex();
+    if (_streamMutex == nullptr) {
+        Serial.println("ERROR: Failed to create stream mutex");
+    }
+#endif
+    
     begin(platformIdentifier, apiKey, modelName); // Call helper to initialize
 }
 
@@ -11,6 +20,15 @@ ESP32_AI_Connect::ESP32_AI_Connect(const char* platformIdentifier, const char* a
 ESP32_AI_Connect::ESP32_AI_Connect(const char* platformIdentifier, const char* apiKey, const char* modelName, const char* endpointUrl) {
     // Set insecure client - consider making this configurable
     _wifiClient.setInsecure();
+    
+#ifdef ENABLE_STREAM_CHAT
+    // Initialize FreeRTOS mutex for thread safety
+    _streamMutex = xSemaphoreCreateMutex();
+    if (_streamMutex == nullptr) {
+        Serial.println("ERROR: Failed to create stream mutex");
+    }
+#endif
+    
     begin(platformIdentifier, apiKey, modelName, endpointUrl); // Call helper to initialize
 }
 
@@ -28,6 +46,14 @@ ESP32_AI_Connect::~ESP32_AI_Connect() {
     
     // Reset tool calls conversation history
     tcChatReset();
+#endif
+
+#ifdef ENABLE_STREAM_CHAT
+    // Clean up FreeRTOS mutex
+    if (_streamMutex != nullptr) {
+        vSemaphoreDelete(_streamMutex);
+        _streamMutex = nullptr;
+    }
 #endif
 }
 
@@ -700,3 +726,440 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
 
     return responseContent; // Return the parsed content or empty string on error
 }
+
+#ifdef ENABLE_STREAM_CHAT
+// --- Enhanced Thread-Safe Helper Methods ---
+
+// Thread-safe helper methods
+bool ESP32_AI_Connect::_acquireStreamLock(uint32_t timeoutMs) const {
+    if (_streamMutex == nullptr) return false;
+    return xSemaphoreTake(_streamMutex, pdMS_TO_TICKS(timeoutMs)) == pdTRUE;
+}
+
+void ESP32_AI_Connect::_releaseStreamLock() const {
+    if (_streamMutex != nullptr) {
+        xSemaphoreGive(_streamMutex);
+    }
+}
+
+bool ESP32_AI_Connect::_setStreamState(StreamState newState) {
+    if (!_acquireStreamLock(100)) return false;
+    
+    StreamState oldState = _streamState;
+    _streamState = newState;
+    
+    #ifdef ENABLE_DEBUG_OUTPUT
+    Serial.printf("Stream state: %d -> %d\n", (int)oldState, (int)newState);
+    #endif
+    
+    _releaseStreamLock();
+    return true;
+}
+
+ESP32_AI_Connect::StreamState ESP32_AI_Connect::_getStreamState() const {
+    // Atomic read of volatile variable - no lock needed for simple read
+    return _streamState;
+}
+
+// --- Streaming Chat Implementation ---
+
+// Streaming parameter setters (separate from regular chat)
+void ESP32_AI_Connect::setStreamChatSystemRole(const char* systemRole) { 
+    if (_acquireStreamLock(100)) {
+        _streamSystemRole = systemRole;
+        _releaseStreamLock();
+    }
+}
+
+void ESP32_AI_Connect::setStreamChatTemperature(float temperature) { 
+    if (_acquireStreamLock(100)) {
+        _streamTemperature = constrain(temperature, 0.0, 2.0);
+        _releaseStreamLock();
+    }
+}
+
+void ESP32_AI_Connect::setStreamChatMaxTokens(int maxTokens) { 
+    if (_acquireStreamLock(100)) {
+        _streamMaxTokens = max(1, maxTokens);
+        _releaseStreamLock();
+    }
+}
+
+bool ESP32_AI_Connect::setStreamChatParameters(String userParameterJsonStr) {
+    // If empty string, clear the parameters
+    if (userParameterJsonStr.isEmpty()) {
+        if (_acquireStreamLock(100)) {
+            _streamCustomParams = "";
+            _releaseStreamLock();
+        }
+        return true;
+    }
+    
+    // Validate JSON format
+    DynamicJsonDocument tempDoc(512); // Temporary document for validation
+    DeserializationError error = deserializeJson(tempDoc, userParameterJsonStr);
+    
+    if (error) {
+        _lastError = "Invalid JSON in streaming custom parameters: " + String(error.c_str());
+        return false;
+    }
+    
+    // Store validated JSON string with thread safety
+    if (_acquireStreamLock(100)) {
+        _streamCustomParams = userParameterJsonStr;
+        _releaseStreamLock();
+    }
+    return true;
+}
+
+// Streaming parameter getters
+String ESP32_AI_Connect::getStreamChatSystemRole() const {
+    if (_acquireStreamLock(100)) {
+        String result = _streamSystemRole;
+        _releaseStreamLock();
+        return result;
+    }
+    return "";
+}
+
+float ESP32_AI_Connect::getStreamChatTemperature() const {
+    if (_acquireStreamLock(100)) {
+        float result = _streamTemperature;
+        _releaseStreamLock();
+        return result;
+    }
+    return -1.0;
+}
+
+int ESP32_AI_Connect::getStreamChatMaxTokens() const {
+    if (_acquireStreamLock(100)) {
+        int result = _streamMaxTokens;
+        _releaseStreamLock();
+        return result;
+    }
+    return -1;
+}
+
+String ESP32_AI_Connect::getStreamChatParameters() const {
+    if (_acquireStreamLock(100)) {
+        String result = _streamCustomParams;
+        _releaseStreamLock();
+        return result;
+    }
+    return "";
+}
+
+// Streaming control methods
+bool ESP32_AI_Connect::isStreaming() const {
+    StreamState state = _getStreamState();
+    return (state == StreamState::ACTIVE || state == StreamState::STARTING);
+}
+
+void ESP32_AI_Connect::stopStreaming() {
+    StreamState currentState = _getStreamState();
+    
+    if (currentState == StreamState::ACTIVE || currentState == StreamState::STARTING) {
+        _setStreamState(StreamState::STOPPING);
+    }
+}
+
+ESP32_AI_Connect::StreamState ESP32_AI_Connect::getStreamState() const {
+    return _getStreamState();
+}
+
+// Enhanced streaming status methods
+uint32_t ESP32_AI_Connect::getStreamChunkCount() const {
+    return _streamChunkCount; // Atomic read of volatile
+}
+
+uint32_t ESP32_AI_Connect::getStreamTotalBytes() const {
+    return _streamTotalBytes; // Atomic read of volatile
+}
+
+uint32_t ESP32_AI_Connect::getStreamElapsedTime() const {
+    if (_streamStartTime == 0) return 0;
+    return millis() - _streamStartTime;
+}
+
+String ESP32_AI_Connect::getStreamChatRawResponse() const {
+    if (_acquireStreamLock(100)) {
+        String response = _streamRawResponse;
+        _releaseStreamLock();
+        return response;
+    }
+    return "";
+}
+
+int ESP32_AI_Connect::getStreamChatResponseCode() const {
+    if (_acquireStreamLock(100)) {
+        int code = _streamResponseCode;
+        _releaseStreamLock();
+        return code;
+    }
+    return 0;
+}
+
+void ESP32_AI_Connect::streamChatReset() {
+    if (!_acquireStreamLock(1000)) return;
+    
+    _streamState = StreamState::IDLE;
+    _streamCallback = nullptr;
+    _streamRawResponse = "";
+    _streamResponseCode = 0;
+    _streamChunkCount = 0;
+    _streamTotalBytes = 0;
+    _streamStartTime = 0;
+    _streamSystemRole = "";
+    _streamTemperature = -1.0;
+    _streamMaxTokens = -1;
+    _streamCustomParams = "";
+    
+    _releaseStreamLock();
+}
+
+// Enhanced thread-safe streaming method
+bool ESP32_AI_Connect::streamChat(const String& userMessage, StreamCallback callback) {
+    // Quick state check without lock first
+    if (_getStreamState() != StreamState::IDLE) {
+        _lastError = "Streaming operation already in progress";
+        return false;
+    }
+    
+    // Acquire lock for critical section
+    if (!_acquireStreamLock(1000)) {
+        _lastError = "Failed to acquire stream lock (timeout)";
+        return false;
+    }
+    
+    // Double-check state under lock (classic double-checked locking pattern)
+    if (_streamState != StreamState::IDLE) {
+        _lastError = "Streaming operation already in progress";
+        _releaseStreamLock();
+        return false;
+    }
+    
+    // Validate inputs
+    if (!_platformHandler) {
+        _lastError = "Platform handler not initialized";
+        _releaseStreamLock();
+        return false;
+    }
+    
+    if (!callback) {
+        _lastError = "Callback function is null";
+        _releaseStreamLock();
+        return false;
+    }
+    
+    // Initialize streaming state
+    _streamState = StreamState::STARTING;
+    _streamCallback = callback;
+    _streamChunkCount = 0;
+    _streamTotalBytes = 0;
+    _streamStartTime = millis();
+    _streamRawResponse = "";
+    _streamResponseCode = 0;
+    _lastError = "";
+    
+    _releaseStreamLock();
+    
+    // Get endpoint URL from handler - use streaming endpoint if available
+    String url = _platformHandler->getStreamEndpoint(_modelName, _apiKey, _customEndpoint);
+    
+    if (url.isEmpty()) {
+        _lastError = "Failed to get endpoint URL from platform handler";
+        _setStreamState(StreamState::ERROR);
+        return false;
+    }
+
+    // Build streaming request body using handler (get parameters safely)
+    String systemRole, customParams;
+    float temperature;
+    int maxTokens;
+    
+    if (_acquireStreamLock(100)) {
+        systemRole = _streamSystemRole;
+        temperature = _streamTemperature;
+        maxTokens = _streamMaxTokens;
+        customParams = _streamCustomParams;
+        _releaseStreamLock();
+    }
+    
+    String requestBody = _platformHandler->buildStreamRequestBody(_modelName, systemRole,
+                                                                 temperature, maxTokens,
+                                                                 userMessage, _reqDoc, customParams);
+    if (requestBody.isEmpty()) {
+        if (_lastError.isEmpty()) _lastError = "Failed to build streaming request body";
+        _setStreamState(StreamState::ERROR);
+        return false;
+    }
+
+    #ifdef ENABLE_DEBUG_OUTPUT
+    Serial.println("---------- AI Streaming Request ----------");
+    Serial.println("URL: " + url);
+    Serial.println("Body: " + requestBody);
+    Serial.println("------------------------------------------");
+    #endif
+
+    // Perform streaming setup (outside of lock to avoid blocking)
+    bool success = _processStreamResponse(url, requestBody);
+    
+    if (success) {
+        // Successful completion (including user interruption)
+        _setStreamState(StreamState::IDLE);
+    } else {
+        // Actual error occurred
+        _setStreamState(StreamState::ERROR);
+    }
+    
+    return success;
+}
+
+// Enhanced stream processing with thread safety and metrics
+bool ESP32_AI_Connect::_processStreamResponse(const String& url, const String& requestBody) {
+    // Clean up any previous connections first
+    _httpClient.end();
+    _wifiClient.stop();
+    delay(50); // Give time for cleanup
+    
+    // Start new connection
+    if (!_httpClient.begin(_wifiClient, url)) {
+        _lastError = "HTTP Client failed to begin connection to: " + url;
+        return false;
+    }
+
+    _platformHandler->setHeaders(_httpClient, _apiKey); // Set headers via handler
+    _httpClient.setTimeout(AI_API_HTTP_TIMEOUT_MS); // Use configured timeout
+    
+    int httpCode = _httpClient.POST(requestBody);
+    
+    // Store HTTP response code safely
+    if (_acquireStreamLock(10)) {
+        _streamResponseCode = httpCode;
+        _releaseStreamLock();
+    }
+
+    if (httpCode <= 0) {
+        _lastError = String("HTTP Request Failed: ") + _httpClient.errorToString(httpCode).c_str();
+        _httpClient.end();
+        _wifiClient.stop();
+        return false;
+    }
+
+    if (httpCode != HTTP_CODE_OK) {
+        String responsePayload = _httpClient.getString();
+        _lastError = "HTTP Error: " + String(httpCode) + " - Response: " + responsePayload;
+        _httpClient.end();
+        _wifiClient.stop();
+        return false;
+    }
+
+    #ifdef ENABLE_DEBUG_OUTPUT
+    Serial.println("---------- AI Streaming Response ----------");
+    Serial.println("HTTP Code: " + String(httpCode));
+    Serial.println("Reading stream...");
+    Serial.println("------------------------------------------");
+    #endif
+
+    // Set state to active now that we're connected
+    _setStreamState(StreamState::ACTIVE);
+
+    // Process streaming response with enhanced metrics
+    Stream* stream = _httpClient.getStreamPtr();
+    unsigned long lastChunkTime = millis();
+    bool streamComplete = false;
+    bool userInterrupted = false;
+    uint32_t localChunkCount = 0;
+    
+    while (_httpClient.connected() && _getStreamState() == StreamState::ACTIVE && 
+           !streamComplete && !userInterrupted) {
+        
+        if (stream->available()) {
+            String chunk = stream->readStringUntil('\n');
+            lastChunkTime = millis();
+            localChunkCount++;
+            
+            // Thread-safe update of raw response and metrics
+            if (_acquireStreamLock(10)) {
+                _streamRawResponse = chunk;
+                _streamTotalBytes += chunk.length();
+                _streamChunkCount = localChunkCount;
+                _releaseStreamLock();
+            }
+            
+            // Process chunk with platform handler
+            bool isComplete = false;
+            String errorMsg = "";
+            String content = _platformHandler->processStreamChunk(chunk, isComplete, errorMsg);
+            
+            if (!errorMsg.isEmpty()) {
+                _lastError = errorMsg;
+                break;
+            }
+            
+            if (isComplete) {
+                streamComplete = true;
+            }
+            
+            // Create enhanced chunk info
+            StreamChunkInfo chunkInfo;
+            chunkInfo.content = content;
+            chunkInfo.isComplete = isComplete;
+            chunkInfo.chunkIndex = localChunkCount;
+            chunkInfo.totalBytes = _streamTotalBytes;
+            chunkInfo.elapsedMs = getStreamElapsedTime();
+            chunkInfo.errorMsg = errorMsg;
+            
+            // Call user callback with enhanced info
+            if (!content.isEmpty() || isComplete) {
+                // Get callback safely
+                StreamCallback callback = nullptr;
+                if (_acquireStreamLock(10)) {
+                    callback = _streamCallback;
+                    _releaseStreamLock();
+                }
+                
+                if (callback && !callback(chunkInfo)) {
+                    userInterrupted = true;
+                    break;
+                }
+            }
+            
+            #ifdef ENABLE_DEBUG_OUTPUT
+            if (!content.isEmpty()) {
+                Serial.print("Stream chunk: ");
+                Serial.println(content);
+            }
+            #endif
+        } else {
+            // Check for timeout and state changes
+            if (millis() - lastChunkTime > STREAM_CHAT_CHUNK_TIMEOUT_MS) {
+                _lastError = "Stream timeout: No data received within " + String(STREAM_CHAT_CHUNK_TIMEOUT_MS) + "ms";
+                break;
+            }
+            
+            if (_getStreamState() == StreamState::STOPPING) {
+                userInterrupted = true;
+                break;
+            }
+            
+            delay(10); // Yield to other tasks
+        }
+    }
+    
+    // Comprehensive cleanup
+    _httpClient.end();
+    _wifiClient.stop();
+    delay(100); // Give extra time for connection cleanup
+    
+    // Handle different exit conditions
+    if (userInterrupted) {
+        // User interruption is not an error - it's a normal way to stop streaming
+        // Don't set _lastError for user interruption
+        return true; // Return true to indicate successful (user-controlled) completion
+    }
+    
+    return streamComplete;
+}
+
+#endif // ENABLE_STREAM_CHAT

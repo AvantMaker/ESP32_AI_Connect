@@ -7,6 +7,9 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <functional>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 // Include configuration and base handler FIRST
 #include "ESP32_AI_Connect_config.h"
@@ -156,6 +159,61 @@ public:
     void tcChatReset();
 #endif
 
+#ifdef ENABLE_STREAM_CHAT
+    // --- Enhanced Thread-Safe Streaming Chat Methods ---
+    
+    // Stream state enumeration for better state management
+    enum class StreamState : uint8_t {
+        IDLE = 0,
+        STARTING = 1,
+        ACTIVE = 2,
+        STOPPING = 3,
+        ERROR = 4
+    };
+    
+    // Enhanced callback function signature with metadata
+    struct StreamChunkInfo {
+        String content;
+        bool isComplete;
+        uint32_t chunkIndex;
+        uint32_t totalBytes;
+        uint32_t elapsedMs;
+        String errorMsg;  // For error reporting in callback
+    };
+    
+    typedef std::function<bool(const StreamChunkInfo& chunkInfo)> StreamCallback;
+
+    // Main streaming method with enhanced thread safety
+    bool streamChat(const String& userMessage, StreamCallback callback);
+
+    // Thread-safe streaming control methods
+    bool isStreaming() const;
+    void stopStreaming();
+    StreamState getStreamState() const;
+    
+    // Enhanced streaming status methods
+    String getStreamChatRawResponse() const;
+    int getStreamChatResponseCode() const;
+    uint32_t getStreamChunkCount() const;
+    uint32_t getStreamTotalBytes() const;
+    uint32_t getStreamElapsedTime() const;
+    
+    // Thread-safe reset
+    void streamChatReset();
+
+    // Streaming parameter setters (separate from regular chat)
+    void setStreamChatSystemRole(const char* systemRole);
+    void setStreamChatTemperature(float temperature);
+    void setStreamChatMaxTokens(int maxTokens);
+    bool setStreamChatParameters(String userParameterJsonStr);
+
+    // Streaming parameter getters
+    String getStreamChatSystemRole() const;
+    float getStreamChatTemperature() const;
+    int getStreamChatMaxTokens() const;
+    String getStreamChatParameters() const;
+#endif
+
     // --- Optional: Access platform-specific features ---
     // Allows getting the specific handler if user needs unique methods
     // Example: AI_API_Platform_Handler* getHandler() { return _platformHandler; }
@@ -201,6 +259,43 @@ private:
     DynamicJsonDocument* _tcConversationDoc = nullptr; // Used to track conversation for follow-up
 #endif
 
+#ifdef ENABLE_STREAM_CHAT
+    // --- Enhanced Thread-Safe Streaming State ---
+    
+    // FreeRTOS-based synchronization (more efficient than std::mutex on ESP32)
+    mutable SemaphoreHandle_t _streamMutex = nullptr;
+    
+    // Atomic state management using ESP32-optimized approach
+    volatile StreamState _streamState = StreamState::IDLE;
+    
+    // Protected callback storage
+    StreamCallback _streamCallback = nullptr;
+    
+    // Streaming metrics (protected by mutex)
+    volatile uint32_t _streamChunkCount = 0;
+    volatile uint32_t _streamTotalBytes = 0;
+    volatile uint32_t _streamStartTime = 0;
+    
+    // Configuration for streaming (protected by mutex)
+    String _streamSystemRole = "";
+    float _streamTemperature = -1.0;
+    int _streamMaxTokens = -1;
+    String _streamCustomParams = "";
+    
+    // Raw response storage (protected by mutex)
+    String _streamRawResponse = "";
+    int _streamResponseCode = 0;
+    
+    // Thread-safe helper methods
+    bool _acquireStreamLock(uint32_t timeoutMs = 1000) const;
+    void _releaseStreamLock() const;
+    bool _setStreamState(StreamState newState);
+    StreamState _getStreamState() const;
+    
+    // Enhanced internal processing method
+    bool _processStreamResponse(const String& url, const String& requestBody);
+#endif
+
     // Internal state
     String _lastError = "";
     AI_API_Platform_Handler* _platformHandler = nullptr; // Pointer to the active handler
@@ -217,4 +312,4 @@ private:
     void _cleanupHandler();
 };
 
-#endif // ESP32_AI_CONNECT_H
+#endif // ESP32_AI_CONNECT_H 

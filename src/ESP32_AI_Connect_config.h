@@ -14,6 +14,12 @@
 // If you don't need tool calls, keep this commented out to save memory
 #define ENABLE_TOOL_CALLS
 
+// --- Streaming Chat Support ---
+// Uncomment the following line to enable streaming chat functionality
+// This will add streamChat methods to the library
+// If you don't need streaming chat, keep this commented out to save memory
+#define ENABLE_STREAM_CHAT
+
 
 // --- Platform Selection ---
 // Uncomment the platforms you want to enable support for.
@@ -30,6 +36,11 @@
 #define AI_API_RESP_JSON_DOC_SIZE 2048
 // Default HTTP timeout
 #define AI_API_HTTP_TIMEOUT_MS 30000 // 30 seconds
+
+// --- Streaming Configuration ---
+// Configure streaming chat behavior (only used when ENABLE_STREAM_CHAT is defined)
+#define STREAM_CHAT_CHUNK_SIZE 512        // Size of each HTTP read chunk
+#define STREAM_CHAT_CHUNK_TIMEOUT_MS 5000 // Timeout for each chunk read
 
 
 #endif // ESP32_AI_CONNECT_CONFIG_H

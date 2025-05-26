@@ -14,6 +14,18 @@ String AI_API_Gemini_Handler::getEndpoint(const String& modelName, const String&
     return "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
 }
 
+#ifdef ENABLE_STREAM_CHAT
+String AI_API_Gemini_Handler::getStreamEndpoint(const String& modelName, const String& apiKey, const String& customEndpoint) const {
+    // If a custom endpoint is provided, use it
+    if (!customEndpoint.isEmpty()) {
+        return customEndpoint;
+    }
+    
+    // Gemini streaming endpoint - uses :streamGenerateContent with ?alt=sse parameter
+    return "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":streamGenerateContent?alt=sse&key=" + apiKey;
+}
+#endif
+
 void AI_API_Gemini_Handler::setHeaders(HTTPClient& httpClient, const String& apiKey) {
     // API key is in the URL, so only Content-Type is strictly needed here.
     // Some Google APIs also accept x-goog-api-key header, but URL method is common.
@@ -926,5 +938,194 @@ String AI_API_Gemini_Handler::buildToolCallsFollowUpRequestBody(const String& mo
     return requestBody;
 }
 #endif // ENABLE_TOOL_CALLS
+
+#ifdef ENABLE_STREAM_CHAT
+String AI_API_Gemini_Handler::buildStreamRequestBody(const String& modelName, const String& systemRole,
+                                                    float temperature, int maxTokens,
+                                                    const String& userMessage, JsonDocument& doc,
+                                                    const String& customParams) {
+    // Use the same logic as buildRequestBody but DON'T add "stream": true
+    // Gemini streaming uses a different endpoint (:streamGenerateContent) instead
+    doc.clear();
+
+    // --- Add System Instruction (Optional) ---
+    if (systemRole.length() > 0) {
+        JsonObject systemInstruction = doc.createNestedObject("systemInstruction");
+        JsonArray parts = systemInstruction.createNestedArray("parts");
+        JsonObject textPart = parts.createNestedObject();
+        textPart["text"] = systemRole;
+    }
+
+    // --- Add User Content ---
+    JsonArray contents = doc.createNestedArray("contents");
+    JsonObject userContent = contents.createNestedObject();
+    userContent["role"] = "user";
+    JsonArray userParts = userContent.createNestedArray("parts");
+    JsonObject userTextPart = userParts.createNestedObject();
+    userTextPart["text"] = userMessage;
+
+    // --- Process custom parameters if provided ---
+    if (customParams.length() > 0) {
+        // Create a temporary document to parse the custom parameters
+        DynamicJsonDocument paramsDoc(512);
+        DeserializationError error = deserializeJson(paramsDoc, customParams);
+        
+        // Only proceed if parsing was successful
+        if (!error) {
+            // Check if there are parameters specifically for generationConfig
+            JsonObject generationConfig;
+            bool hasGenerationConfig = false;
+            
+            for (JsonPair param : paramsDoc.as<JsonObject>()) {
+                // These parameters should go into generationConfig object
+                if (param.key() == "temperature" || param.key() == "topP" || 
+                    param.key() == "topK" || param.key() == "maxOutputTokens" ||
+                    param.key() == "candidateCount" || param.key() == "stopSequences" ||
+                    param.key() == "responseMimeType" || param.key() == "responseSchema" ||
+                    param.key() == "presencePenalty" || param.key() == "frequencyPenalty" ||
+                    param.key() == "seed" || param.key() == "responseLogprobs" ||
+                    param.key() == "logprobs" || param.key() == "enableEnhancedCivicAnswers" || 
+                    param.key() == "speechConfig" || param.key() == "thinkingConfig" || 
+                    param.key() == "mediaResolution") {
+                    
+                    // Create generationConfig object if it doesn't exist yet
+                    if (!hasGenerationConfig) {
+                        generationConfig = doc.createNestedObject("generationConfig");
+                        hasGenerationConfig = true;
+                    }
+                    generationConfig[param.key()] = param.value();
+                }
+                // Other parameters go directly into the root object (skip stream as it's not used)
+                else if (param.key() != "model" && param.key() != "contents" && 
+                         param.key() != "systemInstruction" && param.key() != "stream") {
+                    doc[param.key()] = param.value();
+                }
+            }
+        }
+    }
+
+    // --- Add Generation Config ---
+    bool configAdded = false;
+    JsonObject generationConfig;
+    
+    // Check if generationConfig already exists from custom parameters
+    if (doc.containsKey("generationConfig")) {
+        generationConfig = doc["generationConfig"];
+        configAdded = true;
+    } else {
+        generationConfig = doc.createNestedObject("generationConfig");
+    }
+    
+    if (temperature >= 0.0) {
+        generationConfig["temperature"] = temperature;
+        configAdded = true;
+    }
+    if (maxTokens > 0) {
+        generationConfig["maxOutputTokens"] = maxTokens;
+        configAdded = true;
+    }
+
+    if (!configAdded) {
+        // Remove empty generationConfig object if no parameters were set
+        doc.remove("generationConfig");
+    }
+
+    // Note: Gemini streaming doesn't use "stream": true in the request body
+    // Instead, it uses the :streamGenerateContent endpoint with ?alt=sse
+
+    String requestBody;
+    serializeJson(doc, requestBody);
+    return requestBody;
+}
+
+String AI_API_Gemini_Handler::processStreamChunk(const String& rawChunk, bool& isComplete, String& errorMsg) {
+    resetState(); // Reset state for each chunk
+    isComplete = false;
+    errorMsg = "";
+
+    // Gemini streaming actually DOES use Server-Sent Events format like OpenAI
+    // Format: "data: {json}\n" based on the log provided
+    
+    if (rawChunk.isEmpty()) {
+        return "";
+    }
+
+    // Look for "data: " prefix (like OpenAI/DeepSeek)
+    int dataIndex = rawChunk.indexOf("data: ");
+    if (dataIndex == -1) {
+        // Not a data line, skip
+        return "";
+    }
+
+    // Extract JSON part after "data: "
+    String jsonPart = rawChunk.substring(dataIndex + 6); // 6 = length of "data: "
+    jsonPart.trim(); // Remove any whitespace
+
+    if (jsonPart.isEmpty()) {
+        return "";
+    }
+
+    // Parse the JSON chunk
+    DynamicJsonDocument chunkDoc(1024); // Larger buffer for Gemini responses
+    DeserializationError error = deserializeJson(chunkDoc, jsonPart);
+    if (error) {
+        errorMsg = "Failed to parse Gemini streaming chunk JSON: " + String(error.c_str());
+        return "";
+    }
+
+    // Check for error in the chunk
+    if (chunkDoc.containsKey("error")) {
+        errorMsg = String("API Error in stream: ") + (chunkDoc["error"]["message"] | "Unknown error");
+        return "";
+    }
+
+    // Extract usage metadata if available
+    if (chunkDoc.containsKey("usageMetadata") && chunkDoc["usageMetadata"].is<JsonObject>()) {
+        JsonObject usageMetadata = chunkDoc["usageMetadata"];
+        if (usageMetadata.containsKey("totalTokenCount")) {
+            _lastTotalTokens = usageMetadata["totalTokenCount"].as<int>();
+        }
+    }
+
+    // Extract content from candidates array
+    if (chunkDoc.containsKey("candidates") && chunkDoc["candidates"].is<JsonArray>() && 
+        chunkDoc["candidates"].size() > 0) {
+        
+        JsonObject firstCandidate = chunkDoc["candidates"][0];
+
+        // Check for finish reason
+        if (firstCandidate.containsKey("finishReason")) {
+            _lastFinishReason = firstCandidate["finishReason"].as<String>();
+            String reason = firstCandidate["finishReason"].as<String>();
+            
+            // Mark completion for any finish reason
+            if (reason == "STOP" || reason == "MAX_TOKENS" || reason == "SAFETY" || 
+                reason == "RECITATION" || reason == "OTHER") {
+                isComplete = true;
+                
+                // For safety or other blocking reasons, still return any content but mark complete
+                if (reason != "STOP" && reason != "MAX_TOKENS") {
+                    // Don't treat as error, just mark as complete
+                    // The content extraction below will handle any available text
+                }
+            }
+        }
+
+        // Extract content from the candidate
+        if (firstCandidate.containsKey("content") && firstCandidate["content"].is<JsonObject>()) {
+            JsonObject content = firstCandidate["content"];
+            if (content.containsKey("parts") && content["parts"].is<JsonArray>() && content["parts"].size() > 0) {
+                JsonObject firstPart = content["parts"][0];
+                if (firstPart.containsKey("text") && firstPart["text"].is<const char*>()) {
+                    return firstPart["text"].as<String>();
+                }
+            }
+        }
+    }
+
+    // If no content found but no error, return empty string (normal for some chunks)
+    return "";
+}
+#endif // ENABLE_STREAM_CHAT
 
 #endif // USE_AI_API_GEMINI
