@@ -3,6 +3,22 @@
 
 #include "AI_API_Platform_Handler.h"
 
+/**
+ * AI_API_Claude_Handler - Handler for Anthropic Claude API
+ * 
+ * IMPORTANT CLAUDE API REQUIREMENTS:
+ * - The 'max_tokens' field is REQUIRED and cannot be omitted from requests
+ * - According to Anthropic documentation: https://docs.anthropic.com/en/api/messages
+ * - All request methods automatically include max_tokens with default value 1024
+ * - If user sets maxTokens > 0, that value is used instead of default
+ * 
+ * This handler supports:
+ * - Regular chat messages
+ * - Tool calling (function calling)
+ * - Streaming chat
+ * - System prompts
+ * - Custom parameters via setChatParameters()
+ */
 class AI_API_Claude_Handler : public AI_API_Platform_Handler {
 public:
     // Constructor and destructor

@@ -58,9 +58,11 @@ String AI_API_Claude_Handler::buildRequestBody(const String& modelName, const St
             doc["temperature"] = temperature;
         }
         
-        if (maxTokens > 0) {
-            doc["max_tokens"] = maxTokens;
-        }
+        // IMPORTANT: Claude API requires 'max_tokens' field - it cannot be omitted
+        // According to Anthropic documentation: https://docs.anthropic.com/en/api/messages
+        // The 'max_tokens' field is required and cannot be left empty
+        // Use provided value if > 0, otherwise use default of 1024
+        doc["max_tokens"] = (maxTokens > 0) ? maxTokens : 1024;
         
         // Add system message if specified (only if user has set it with setTCChatSystemRole)
         if (systemRole.length() > 0) {
@@ -161,8 +163,10 @@ String AI_API_Claude_Handler::buildToolCallsRequestBody(const String& modelName,
         // Set the model
         doc["model"] = modelName;
         
-        // Add max_tokens parameter (required for Claude's tool calls API)
-        // Use default value of 1024 if not provided
+        // IMPORTANT: Claude API requires 'max_tokens' field - it cannot be omitted
+        // According to Anthropic documentation: https://docs.anthropic.com/en/api/messages
+        // The 'max_tokens' field is required and cannot be left empty
+        // Use provided value if > 0, otherwise use default of 1024
         doc["max_tokens"] = (maxTokens > 0) ? maxTokens : 1024;
         
         // Add system message if specified (only if user has set it with setTCChatSystemRole)
@@ -442,8 +446,10 @@ String AI_API_Claude_Handler::buildToolCallsFollowUpRequestBody(const String& mo
         // Set the model
         doc["model"] = modelName;
         
-        // Add max_tokens parameter (required for Claude's tool calls API)
-        // Use default value of 1024 if not provided
+        // IMPORTANT: Claude API requires 'max_tokens' field - it cannot be omitted
+        // According to Anthropic documentation: https://docs.anthropic.com/en/api/messages
+        // The 'max_tokens' field is required and cannot be left empty
+        // Use provided value if > 0, otherwise use default of 1024
         doc["max_tokens"] = (followUpMaxTokens > 0) ? followUpMaxTokens : 1024;
         
         // Add system message if specified (only if user has set it with setTCChatSystemRole)
@@ -759,9 +765,11 @@ String AI_API_Claude_Handler::buildStreamRequestBody(const String& modelName, co
             doc["temperature"] = temperature;
         }
         
-        if (maxTokens > 0) {
-            doc["max_tokens"] = maxTokens;
-        }
+        // IMPORTANT: Claude API requires 'max_tokens' field - it cannot be omitted
+        // According to Anthropic documentation: https://docs.anthropic.com/en/api/messages
+        // The 'max_tokens' field is required and cannot be left empty
+        // Use provided value if > 0, otherwise use default of 1024
+        doc["max_tokens"] = (maxTokens > 0) ? maxTokens : 1024;
         
         // Add system message if specified
         if (systemRole.length() > 0) {
