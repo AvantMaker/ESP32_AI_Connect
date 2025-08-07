@@ -5,7 +5,7 @@
 [![Language](https://img.shields.io/badge/Language-Arduino-teal.svg)](https://www.arduino.cc/)
 [![AvantMaker](https://img.shields.io/badge/By-AvantMaker-red.svg)](https://www.avantmaker.com)
 ---
-> README Version 0.0.5 • Revised: May 26, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> README Version 0.0.6 • Revised: August 6, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 
 This project is proudly brought to you by the team at **AvantMaker.com**.
 
@@ -64,14 +64,29 @@ The **ESP32_AI_Connect** library depends on the **ArduinoJson** library (version
 
 ## Installation
 
-1. Download the latest release from GitHub
-2. In Arduino IDE:
-   - Sketch → Include Library → Add .ZIP Library...
-   - Select the downloaded ZIP file
-3. Alternatively, clone into your Arduino libraries folder:
-   ```bash
-   git clone git@github.com:AvantMaker/ESP32_AI_Connect.git
-   ```
+There are two methods to install the `ESP32_AI_Connect` library. We highly recommend using the Arduino IDE's Library Manager for the easiest installation.
+
+### Method 1: Using the Arduino IDE Library Manager (Recommended)
+
+This is the simplest way to install the library and its required dependencies.
+
+1.  Open the Arduino IDE.
+2.  Navigate to the Library Manager by clicking `Tools > Manage Libraries...`
+3.  In the search bar, type "ESP32_AI_Connect".
+4.  Select the `ESP32_AI_Connect` library and click the "Install" button.
+5.  A dialog will appear, informing you that the library requires an additional dependency: "ArduinoJson". A screen capture of this prompt is shown below.
+
+6.  Click "INSTALL ALL" to automatically install both `ESP32_AI_Connect` and its dependency, `ArduinoJson`.
+
+The library and its dependency will now be installed and ready for use.
+
+### Method 2: Manual Installation from GitHub
+
+This method is for users who prefer to download the library directly from this repository.
+
+1.  Click the "Code" button on this repository page and select "Download ZIP".
+2.  In the Arduino IDE, go to `Sketch > Include Library > Add .ZIP Library...` and select the downloaded ZIP file.
+3.  You must also manually install the required dependency, `ArduinoJson`. To do this, search for and install "ArduinoJson" from the Arduino IDE's Library Manager.
 
 ## Quick Start
 
