@@ -1,4 +1,5 @@
 #include "ESP32_AI_Connect.h"
+#include <WiFi.h>  
 
 // Constructor
 ESP32_AI_Connect::ESP32_AI_Connect(const char* platformIdentifier, const char* apiKey, const char* modelName) {
@@ -63,6 +64,85 @@ void ESP32_AI_Connect::_cleanupHandler() {
     _platformHandler = nullptr;
 }
 
+#ifdef ENABLE_AUTO_RETRY
+// --- Connection Resilience Helper Methods ---
+
+// Check if WiFi is connected
+bool ESP32_AI_Connect::_checkWiFiConnected() {
+    if (WiFi.status() != WL_CONNECTED) {
+        _lastError = "WiFi not connected. Please reconnect WiFi and try again.";
+        return false;
+    }
+    return true;
+}
+
+// Cleanup stale connections if threshold exceeded
+void ESP32_AI_Connect::_cleanupStaleConnection() {
+    // If this is the first request or within threshold, skip cleanup
+    if (_lastSuccessfulRequestTime == 0) {
+        return; // First request, no need to cleanup
+    }
+    
+    unsigned long timeSinceLastSuccess = millis() - _lastSuccessfulRequestTime;
+    
+    // Check for millis() rollover (occurs every ~49 days)
+    // If current millis is less than last success time, rollover occurred
+    if (millis() < _lastSuccessfulRequestTime) {
+        // After rollover, reset the timestamp and skip cleanup this time
+        _lastSuccessfulRequestTime = millis();
+        return;
+    }
+    
+    // If connection is stale, cleanup and reinitialize
+    if (timeSinceLastSuccess > AUTO_RETRY_STALE_CONNECTION_THRESHOLD_MS) {
+        #ifdef ENABLE_DEBUG_OUTPUT
+        Serial.println("[Auto-Retry] Stale connection detected. Cleaning up...");
+        #endif
+        
+        _httpClient.end();
+        _wifiClient.stop();
+        delay(100); // Brief delay to ensure cleanup completes
+        
+        #ifdef ENABLE_DEBUG_OUTPUT
+        Serial.println("[Auto-Retry] Connection cleanup complete.");
+        #endif
+    }
+}
+
+// Determine if an HTTP error code is retryable
+bool ESP32_AI_Connect::_isRetryableError(int httpCode) {
+    // Negative codes are HTTPClient errors (timeout, connection failed, etc.)
+    if (httpCode < 0) {
+        return true; // Retry on network/connection errors
+    }
+    
+    // 5xx server errors are retryable
+    if (httpCode >= 500 && httpCode <= 599) {
+        return true;
+    }
+    
+    // All other codes (2xx success, 4xx client errors) are not retryable
+    return false;
+}
+
+// Calculate retry delay using exponential backoff
+uint32_t ESP32_AI_Connect::_calculateRetryDelay(int attemptNumber) {
+    // attemptNumber: 1, 2, 3, ...
+    // delays: 1000ms, 2000ms, 4000ms, 8000ms (capped at 10000ms)
+    uint32_t delay = AUTO_RETRY_INITIAL_DELAY_MS;
+    
+    for (int i = 1; i < attemptNumber; i++) {
+        delay = delay * 2;
+        if (delay > AUTO_RETRY_MAX_DELAY_MS) {
+            delay = AUTO_RETRY_MAX_DELAY_MS;
+            break;
+        }
+    }
+    
+    return delay;
+}
+#endif // ENABLE_AUTO_RETRY
+
 // Initialization / Re-initialization logic
 bool ESP32_AI_Connect::begin(const char* platformIdentifier, const char* apiKey, const char* modelName) {
     return begin(platformIdentifier, apiKey, modelName, nullptr);
@@ -102,6 +182,12 @@ bool ESP32_AI_Connect::begin(const char* platformIdentifier, const char* apiKey,
     #ifdef USE_AI_API_CLAUDE
     if (platformStr == "claude") {
         _platformHandler = new AI_API_Claude_Handler();
+    } else
+    #endif
+
+    #ifdef USE_AI_API_GROK
+    if (platformStr == "grok") {
+        _platformHandler = new AI_API_Grok_Handler();
     } else
     #endif
 
@@ -367,15 +453,21 @@ void ESP32_AI_Connect::tcChatReset() {
     _tcRawResponse = ""; // Clear the raw tool calling response
     _tcChatResponseCode = 0; // Reset the stored tcChat HTTP response code
     _tcReplyResponseCode = 0; // Reset the stored tcReply HTTP response code
-    
+
+    // Clean up conversation document if allocated
+    if (_tcConversationDoc != nullptr) {
+        delete _tcConversationDoc;
+        _tcConversationDoc = nullptr;
+    }
+
     // Reset but don't delete tool definitions
     // If users want to clear tools, they need to call setTCTools with empty array
-    
+
     // Reset configuration to defaults
     _tcSystemRole = "";
     _tcMaxToken = -1;
     _tcToolChoice = "";
-    
+
     // Reset follow-up configuration to defaults
     _tcFollowUpMaxToken = -1;
     _tcFollowUpToolChoice = "";
@@ -398,6 +490,16 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
         _lastError = "Tool calls not set up. Call setTCTools() first.";
         return "";
     }
+
+#ifdef ENABLE_AUTO_RETRY
+    // Check WiFi connection before attempting request
+    if (!_checkWiFiConnected()) {
+        return ""; // Error message already set by _checkWiFiConnected()
+    }
+    
+    // Cleanup stale connections if needed
+    _cleanupStaleConnection();
+#endif
     
     // Reset conversation tracking for new chat
     _lastUserMessage = tcUserMessage;
@@ -420,6 +522,17 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
         if (_lastError.isEmpty()) _lastError = "Failed to build tool calls request body.";
         return "";
     }
+
+#ifdef ENABLE_AUTO_RETRY
+    // --- Retry Loop ---
+    int maxAttempts = AUTO_RETRY_MAX_ATTEMPTS + 1; // +1 for initial attempt
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        #ifdef ENABLE_DEBUG_OUTPUT
+        if (attempt > 1) {
+            Serial.printf("[Auto-Retry] Tool Call Attempt %d/%d\n", attempt, maxAttempts);
+        }
+        #endif
+#endif // ENABLE_AUTO_RETRY
     
     #ifdef ENABLE_DEBUG_OUTPUT
     Serial.println("---------- AI Tool Calls Request ----------");
@@ -469,6 +582,10 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
                     }
                 }
                 
+#ifdef ENABLE_AUTO_RETRY
+                // Success! Update timestamp and return
+                _lastSuccessfulRequestTime = millis();
+#endif
                 _httpClient.end(); // Clean up connection
                 return responseContent;
             } else {
@@ -481,6 +598,32 @@ String ESP32_AI_Connect::tcChat(const String& tcUserMessage) {
     } else {
         _lastError = "HTTP Client failed to begin connection to: " + url;
     }
+
+#ifdef ENABLE_AUTO_RETRY
+        // Check if we should retry
+        if (attempt < maxAttempts && _isRetryableError(_tcChatResponseCode)) {
+            uint32_t retryDelay = _calculateRetryDelay(attempt);
+            
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.printf("[Auto-Retry] Tool call failed (HTTP %d), retrying in %dms...\n", 
+                         _tcChatResponseCode, retryDelay);
+            #endif
+            
+            delay(retryDelay);
+            // Loop continues to next attempt
+        } else {
+            // Either exhausted retries or non-retryable error
+            #ifdef ENABLE_DEBUG_OUTPUT
+            if (attempt >= maxAttempts) {
+                Serial.printf("[Auto-Retry] Tool call failed after %d attempts\n", maxAttempts);
+            } else {
+                Serial.println("[Auto-Retry] Non-retryable error, aborting");
+            }
+            #endif
+            break; // Exit retry loop
+        }
+    } // End retry loop
+#endif // ENABLE_AUTO_RETRY
     
     return ""; // Return empty string on error
 }
@@ -652,6 +795,16 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
         return "";
     }
 
+#ifdef ENABLE_AUTO_RETRY
+    // Check WiFi connection before attempting request
+    if (!_checkWiFiConnected()) {
+        return ""; // Error message already set by _checkWiFiConnected()
+    }
+    
+    // Cleanup stale connections if needed
+    _cleanupStaleConnection();
+#endif
+
     // Get endpoint URL from handler, passing the custom endpoint if set
     String url = _platformHandler->getEndpoint(_modelName, _apiKey, _customEndpoint);
     if (url.isEmpty()) {
@@ -669,6 +822,18 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
         if (_lastError.isEmpty()) _lastError = "Failed to build request body (handler returned empty).";
         return "";
     }
+
+#ifdef ENABLE_AUTO_RETRY
+    // --- Retry Loop ---
+    int maxAttempts = AUTO_RETRY_MAX_ATTEMPTS + 1; // +1 for initial attempt
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        #ifdef ENABLE_DEBUG_OUTPUT
+        if (attempt > 1) {
+            Serial.printf("[Auto-Retry] Attempt %d/%d\n", attempt, maxAttempts);
+        }
+        #endif
+#endif // ENABLE_AUTO_RETRY
+
     #ifdef ENABLE_DEBUG_OUTPUT
      // --- Debug Start: Request ---
      Serial.println("---------- AI Request ----------");
@@ -677,7 +842,6 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
      Serial.println("-------------------------------");
      // --- Debug End: Request ---
     #endif // ENABLE_DEBUG_OUTPUT
-
 
     // --- Perform HTTP POST Request ---
     _httpClient.end(); // Ensure previous connection is closed
@@ -712,6 +876,13 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
                 if(responseContent.isEmpty() && _lastError.isEmpty()){
                     _lastError = "Handler failed to parse response or returned empty content.";
                 }
+                
+#ifdef ENABLE_AUTO_RETRY
+                // Success! Update timestamp and return
+                _lastSuccessfulRequestTime = millis();
+#endif
+                _httpClient.end(); // Clean up connection
+                return responseContent;
             } else {
                 _lastError = "HTTP Error: " + String(httpCode) + " - Response: " + responsePayload;
             }
@@ -723,6 +894,31 @@ String ESP32_AI_Connect::chat(const String& userMessage) {
          _lastError = "HTTP Client failed to begin connection to: " + url;
     }
 
+#ifdef ENABLE_AUTO_RETRY
+        // Check if we should retry
+        if (attempt < maxAttempts && _isRetryableError(_chatResponseCode)) {
+            uint32_t retryDelay = _calculateRetryDelay(attempt);
+            
+            #ifdef ENABLE_DEBUG_OUTPUT
+            Serial.printf("[Auto-Retry] Request failed (HTTP %d), retrying in %dms...\n", 
+                         _chatResponseCode, retryDelay);
+            #endif
+            
+            delay(retryDelay);
+            // Loop continues to next attempt
+        } else {
+            // Either exhausted retries or non-retryable error
+            #ifdef ENABLE_DEBUG_OUTPUT
+            if (attempt >= maxAttempts) {
+                Serial.printf("[Auto-Retry] Request failed after %d attempts\n", maxAttempts);
+            } else {
+                Serial.println("[Auto-Retry] Non-retryable error, aborting");
+            }
+            #endif
+            break; // Exit retry loop
+        }
+    } // End retry loop
+#endif // ENABLE_AUTO_RETRY
 
     return responseContent; // Return the parsed content or empty string on error
 }
@@ -924,6 +1120,16 @@ bool ESP32_AI_Connect::streamChat(const String& userMessage, StreamCallback call
         _lastError = "Streaming operation already in progress";
         return false;
     }
+
+#ifdef ENABLE_AUTO_RETRY
+    // Check WiFi connection before attempting streaming (no retry for streaming)
+    if (!_checkWiFiConnected()) {
+        return false; // Error message already set by _checkWiFiConnected()
+    }
+    
+    // Cleanup stale connections if needed
+    _cleanupStaleConnection();
+#endif
     
     // Acquire lock for critical section
     if (!_acquireStreamLock(1000)) {
@@ -1006,6 +1212,10 @@ bool ESP32_AI_Connect::streamChat(const String& userMessage, StreamCallback call
     
     if (success) {
         // Successful completion (including user interruption)
+#ifdef ENABLE_AUTO_RETRY
+        // Update timestamp on successful stream completion
+        _lastSuccessfulRequestTime = millis();
+#endif
         _setStreamState(StreamState::IDLE);
     } else {
         // Actual error occurred

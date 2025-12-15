@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 2 Basic LLM Chat Implementation
-> **Version 0.0.5** • Revised: May 15, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Document Version 0.0.5** • Revised: May 15, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 
 ## Overview
 

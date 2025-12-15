@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 4 Tool Calls Follow-Up Techniques
-> **Version 0.0.3** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Document Version 0.0.3** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Introduction
 
 This article is a follow-up to the previous guide "Tool Calls Implementation Basics". If you haven't read that article yet, please do so before continuing, as this guide builds upon the concepts introduced there.

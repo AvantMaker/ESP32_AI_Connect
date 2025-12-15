@@ -29,6 +29,9 @@
 #ifdef USE_AI_API_CLAUDE
 #include "AI_API_Claude.h"
 #endif
+#ifdef USE_AI_API_GROK
+#include "AI_API_Grok.h"
+#endif
 // Add other conditional includes here
 
 class ESP32_AI_Connect {
@@ -232,6 +235,11 @@ private:
     float _temperature = -1.0; // Use API default
     int _maxTokens = -1;       // Use API default
     String _chatCustomParams = ""; // Store custom parameters as JSON string
+
+#ifdef ENABLE_AUTO_RETRY
+    // Connection resilience state
+    unsigned long _lastSuccessfulRequestTime = 0; // Track last successful request for stale connection detection
+#endif
     
     // Raw response storage
     String _chatRawResponse = "";    // Store the raw response from chat method
@@ -310,6 +318,14 @@ private:
 
     // Private helper to clean up handler
     void _cleanupHandler();
+
+#ifdef ENABLE_AUTO_RETRY
+    // Connection resilience helper methods
+    bool _checkWiFiConnected();
+    void _cleanupStaleConnection();
+    bool _isRetryableError(int httpCode);
+    uint32_t _calculateRetryDelay(int attemptNumber);
+#endif
 };
 
 #endif // ESP32_AI_CONNECT_H 

@@ -1,5 +1,5 @@
 # ESP32_AI_Connect Library User Guide - 3 Tool Calls Implementation Basics
-> **Version 0.0.6** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> **Document Version 0.0.6** • Revised: May 12, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 ## Overview
 
 This guide will walk you through the process of setting up and using tool calls (tool calling) with Large Language Models (LLMs) using the ESP32_AI_Connect library. We'll use the `tool_calling_demo.ino` sketch stored in the examples folder as our reference implementation, explaining each component in detail so you can understand how to integrate AI tool calling capabilities into your ESP32 projects with ESP32_AI_Connect.
