@@ -99,8 +99,8 @@ String getWeatherData(const String& city, const String& units) {
 When you receive a response with tool calls, you need to parse the JSON and execute the appropriate functions:
 
 ```cpp
-// Parse the tool calls JSON
-DynamicJsonDocument doc(1536); // Increased size for multiple tool calls
+// Parse the tool calls JSON (requires ArduinoJson v7)
+JsonDocument doc;
 DeserializationError error = deserializeJson(doc, result);
 if (error) {
   Serial.println("deserializeJson() failed: " + String(error.c_str()));
@@ -108,7 +108,7 @@ if (error) {
 }
 
 // Create a JSON array to hold tool results
-DynamicJsonDocument resultDoc(1536);
+JsonDocument resultDoc;
 JsonArray toolResults = resultDoc.to<JsonArray>();
 
 // Process each tool call
@@ -122,7 +122,7 @@ for (JsonObject toolCall : toolCalls) {
   String functionArgs = toolCall["function"]["arguments"].as<String>();
   
   // Parse function arguments
-  DynamicJsonDocument argsDoc(512);
+  JsonDocument argsDoc;
   error = deserializeJson(argsDoc, functionArgs);
   if (error) {
     Serial.println("Failed to parse function arguments: " + String(error.c_str()));
@@ -134,7 +134,7 @@ for (JsonObject toolCall : toolCalls) {
   
   if (functionName == "get_weather") {
     String city = argsDoc["city"].as<String>();
-    String units = argsDoc.containsKey("units") ? argsDoc["units"].as<String>() : "celsius";
+    String units = !argsDoc["units"].isNull() ? argsDoc["units"].as<String>() : "celsius";
     
     functionResult = getWeatherData(city, units);
   }
@@ -142,16 +142,16 @@ for (JsonObject toolCall : toolCalls) {
     String deviceType = argsDoc["device_type"].as<String>();
     String deviceId = argsDoc["device_id"].as<String>();
     String action = argsDoc["action"].as<String>();
-    String value = argsDoc.containsKey("value") ? argsDoc["value"].as<String>() : "";
+    String value = !argsDoc["value"].isNull() ? argsDoc["value"].as<String>() : "";
     
     functionResult = controlDevice(deviceType, deviceId, action, value);
   }
   
   // Create a tool result object
-  JsonObject toolResult = toolResults.createNestedObject();
+  JsonObject toolResult = toolResults.add<JsonObject>();
   toolResult["tool_call_id"] = toolCallId;
   
-  JsonObject function = toolResult.createNestedObject("function");
+  JsonObject function = toolResult["function"].to<JsonObject>();
   function["name"] = functionName;
   function["output"] = functionResult;
 }
@@ -326,13 +326,13 @@ Let's walk through the complete flow of a tool call interaction using the exampl
 
 ### 1. Memory Management
 
-Tool call follow-up requires additional JSON documents for parsing arguments and formatting results. Be mindful of memory usage:
+Tool call follow-up requires additional JSON documents for parsing arguments and formatting results. ArduinoJson v7 uses auto-sizing `JsonDocument`:
 
 ```cpp
-// Use appropriately sized JSON documents
-DynamicJsonDocument doc(1536);       // For parsing the tool calls
-DynamicJsonDocument argsDoc(512);    // For parsing function arguments
-DynamicJsonDocument resultDoc(1536); // For formatting results
+// ArduinoJson v7 uses auto-sizing JsonDocument
+JsonDocument doc;       // For parsing the tool calls
+JsonDocument argsDoc;   // For parsing function arguments
+JsonDocument resultDoc; // For formatting results
 ```
 
 ### 2. Error Handling
@@ -349,7 +349,7 @@ if (error) {
 
 // Error handling for function execution
 if (functionName == "get_weather") {
-  if (!argsDoc.containsKey("city")) {
+  if (argsDoc["city"].isNull()) {
     functionResult = "Error: city parameter is required";
   } else {
     // Execute function normally
@@ -393,7 +393,7 @@ For more complex applications, you might want to create a reusable function to h
 
 ```cpp
 String handleToolCalls(ESP32_AI_Connect& ai, const String& result) {
-  DynamicJsonDocument doc(1536);
+  JsonDocument doc;
   DeserializationError error = deserializeJson(doc, result);
   if (error) {
     Serial.print("deserializeJson() failed: ");
@@ -402,7 +402,7 @@ String handleToolCalls(ESP32_AI_Connect& ai, const String& result) {
   }
   
   JsonArray toolCalls = doc.as<JsonArray>();
-  DynamicJsonDocument resultDoc(1536);
+  JsonDocument resultDoc;
   JsonArray resultArray = resultDoc.to<JsonArray>();
   
   for(JsonObject toolCall : toolCalls) {
@@ -410,29 +410,29 @@ String handleToolCalls(ESP32_AI_Connect& ai, const String& result) {
     const char* functionName = toolCall["function"]["name"].as<String>();
     const char* functionArgsStr = toolCall["function"]["arguments"].as<String>();
     
-    DynamicJsonDocument argsDoc(512);
+    JsonDocument argsDoc;
     deserializeJson(argsDoc, functionArgsStr);
     
     String functionResult;
     // Execute the appropriate function based on name
     if (String(functionName) == "get_weather") {
       String city = argsDoc["city"];
-      String units = argsDoc.containsKey("units") ? argsDoc["units"].as<String>() : "celsius";
+      String units = !argsDoc["units"].isNull() ? argsDoc["units"].as<String>() : "celsius";
       functionResult = getWeatherData(city, units);
     } else if (String(functionName) == "control_device") {
       // Handle other function types
       String deviceType = argsDoc["device_type"].as<String>();
       String deviceId = argsDoc["device_id"].as<String>();
       String action = argsDoc["action"].as<String>();
-      String value = argsDoc.containsKey("value") ? argsDoc["value"].as<String>() : "";
+      String value = !argsDoc["value"].isNull() ? argsDoc["value"].as<String>() : "";
       functionResult = controlDevice(deviceType, deviceId, action, value);
     } else {
       functionResult = "Unknown function: " + String(functionName);
     }
     
-    JsonObject resultObj = resultArray.createNestedObject();
+    JsonObject resultObj = resultArray.add<JsonObject>();
     resultObj["tool_call_id"] = toolCallId;
-    JsonObject functionObj = resultObj.createNestedObject("function");
+    JsonObject functionObj = resultObj["function"].to<JsonObject>();
     functionObj["name"] = functionName;
     functionObj["output"] = functionResult;
   }

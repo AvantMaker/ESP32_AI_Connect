@@ -26,20 +26,20 @@ String AI_API_Grok_Handler::buildRequestBody(const String& modelName, const Stri
 
     doc["model"] = modelName;
     
-    JsonArray messages = doc.createNestedArray("messages");
+    JsonArray messages = doc["messages"].to<JsonArray>();
     if (systemRole.length() > 0) {
-        JsonObject systemMsg = messages.createNestedObject();
+        JsonObject systemMsg = messages.add<JsonObject>();
         systemMsg["role"] = "system";
         systemMsg["content"] = systemRole;
     }
-    JsonObject userMsg = messages.createNestedObject();
+    JsonObject userMsg = messages.add<JsonObject>();
     userMsg["role"] = "user";
     userMsg["content"] = userMessage;
 
     // Process custom parameters if provided
     if (customParams.length() > 0) {
         // Create a temporary document to parse the custom parameters
-        DynamicJsonDocument paramsDoc(512);
+        JsonDocument paramsDoc;
         DeserializationError error = deserializeJson(paramsDoc, customParams);
         
         // Only proceed if parsing was successful
@@ -77,30 +77,30 @@ String AI_API_Grok_Handler::parseResponseBody(const String& responsePayload,
         return "";
     }
 
-    if (doc.containsKey("error")) {
+    if (!doc["error"].isNull()) {
         errorMsg = String("API Error: ") + (doc["error"]["message"] | "Unknown error");
         return "";
     }
 
     // Extract total tokens if available
-    if (doc.containsKey("usage") && doc["usage"].is<JsonObject>()) {
+    if (doc["usage"].is<JsonObject>()) {
         JsonObject usage = doc["usage"];
-        if (usage.containsKey("total_tokens")) {
+        if (!usage["total_tokens"].isNull()) {
             _lastTotalTokens = usage["total_tokens"].as<int>(); // Store in base class member
         }
     }
 
-    if (doc.containsKey("choices") && doc["choices"].is<JsonArray>() && !doc["choices"].isNull() && doc["choices"].size() > 0) {
+    if (doc["choices"].is<JsonArray>() && doc["choices"].size() > 0) {
        JsonObject firstChoice = doc["choices"][0];
 
        // Extract finish reason if available
-       if (firstChoice.containsKey("finish_reason")) {
+       if (!firstChoice["finish_reason"].isNull()) {
            _lastFinishReason = firstChoice["finish_reason"].as<String>(); // Store in base class member
        }
 
-       if (firstChoice.containsKey("message") && firstChoice["message"].is<JsonObject>()) {
+       if (firstChoice["message"].is<JsonObject>()) {
            JsonObject message = firstChoice["message"];
-           if (message.containsKey("content") && message["content"].is<const char*>()) {
+           if (message["content"].is<const char*>()) {
                return message["content"].as<String>();
            }
        }
@@ -121,20 +121,20 @@ String AI_API_Grok_Handler::buildStreamRequestBody(const String& modelName, cons
     doc["model"] = modelName;
     doc["stream"] = true; // Enable streaming
     
-    JsonArray messages = doc.createNestedArray("messages");
+    JsonArray messages = doc["messages"].to<JsonArray>();
     if (systemRole.length() > 0) {
-        JsonObject systemMsg = messages.createNestedObject();
+        JsonObject systemMsg = messages.add<JsonObject>();
         systemMsg["role"] = "system";
         systemMsg["content"] = systemRole;
     }
-    JsonObject userMsg = messages.createNestedObject();
+    JsonObject userMsg = messages.add<JsonObject>();
     userMsg["role"] = "user";
     userMsg["content"] = userMessage;
 
     // Process custom parameters if provided
     if (customParams.length() > 0) {
         // Create a temporary document to parse the custom parameters
-        DynamicJsonDocument paramsDoc(512);
+        JsonDocument paramsDoc;
         DeserializationError error = deserializeJson(paramsDoc, customParams);
         
         // Only proceed if parsing was successful
@@ -196,7 +196,7 @@ String AI_API_Grok_Handler::processStreamChunk(const String& rawChunk, bool& isC
     }
 
     // Parse the JSON chunk
-    DynamicJsonDocument chunkDoc(1024);
+    JsonDocument chunkDoc;
     DeserializationError error = deserializeJson(chunkDoc, jsonPart);
     if (error) {
         errorMsg = "Failed to parse stream chunk: " + String(error.c_str());
@@ -204,17 +204,17 @@ String AI_API_Grok_Handler::processStreamChunk(const String& rawChunk, bool& isC
     }
 
     // Check for error in chunk
-    if (chunkDoc.containsKey("error")) {
+    if (!chunkDoc["error"].isNull()) {
         errorMsg = String("Stream error: ") + (chunkDoc["error"]["message"] | "Unknown error");
         return "";
     }
 
     // Extract content from delta
-    if (chunkDoc.containsKey("choices") && chunkDoc["choices"].is<JsonArray>() && chunkDoc["choices"].size() > 0) {
+    if (chunkDoc["choices"].is<JsonArray>() && chunkDoc["choices"].size() > 0) {
         JsonObject firstChoice = chunkDoc["choices"][0];
         
         // Check finish_reason
-        if (firstChoice.containsKey("finish_reason") && !firstChoice["finish_reason"].isNull()) {
+        if (!firstChoice["finish_reason"].isNull()) {
             _lastFinishReason = firstChoice["finish_reason"].as<String>();
             if (_lastFinishReason == "stop" || _lastFinishReason == "length" || _lastFinishReason == "tool_calls") {
                 isComplete = true;
@@ -222,9 +222,9 @@ String AI_API_Grok_Handler::processStreamChunk(const String& rawChunk, bool& isC
         }
         
         // Extract delta content
-        if (firstChoice.containsKey("delta") && firstChoice["delta"].is<JsonObject>()) {
+        if (firstChoice["delta"].is<JsonObject>()) {
             JsonObject delta = firstChoice["delta"];
-            if (delta.containsKey("content") && delta["content"].is<const char*>()) {
+            if (delta["content"].is<const char*>()) {
                 return delta["content"].as<String>();
             }
         }
@@ -245,37 +245,37 @@ String AI_API_Grok_Handler::buildToolCallsRequestBody(const String& modelName,
     doc["model"] = modelName;
     
     // Build messages array
-    JsonArray messages = doc.createNestedArray("messages");
+    JsonArray messages = doc["messages"].to<JsonArray>();
     
     // Add system message if provided
     if (systemMessage.length() > 0) {
-        JsonObject sysMsg = messages.createNestedObject();
+        JsonObject sysMsg = messages.add<JsonObject>();
         sysMsg["role"] = "system";
         sysMsg["content"] = systemMessage;
     }
     
     // Add user message
-    JsonObject userMsg = messages.createNestedObject();
+    JsonObject userMsg = messages.add<JsonObject>();
     userMsg["role"] = "user";
     userMsg["content"] = userMessage;
     
     // Add tools array - Grok uses OpenAI format
-    JsonArray tools = doc.createNestedArray("tools");
+    JsonArray tools = doc["tools"].to<JsonArray>();
     for (int i = 0; i < toolsArraySize; i++) {
-        DynamicJsonDocument toolDoc(1024);
+        JsonDocument toolDoc;
         DeserializationError error = deserializeJson(toolDoc, toolsArray[i]);
         if (!error) {
-            JsonObject toolObj = tools.createNestedObject();
+            JsonObject toolObj = tools.add<JsonObject>();
             
             // Check if the tool definition follows our simplified format or OpenAI format
-            if (toolDoc.containsKey("type") && toolDoc["type"] == "function") {
+            if (toolDoc["type"].is<const char*>() && toolDoc["type"] == "function") {
                 // Already in OpenAI format, copy as-is
                 toolObj["type"] = "function";
                 toolObj["function"] = toolDoc["function"];
             } else {
                 // Our simplified format - convert to OpenAI format
                 toolObj["type"] = "function";
-                JsonObject functionObj = toolObj.createNestedObject("function");
+                JsonObject functionObj = toolObj["function"].to<JsonObject>();
                 functionObj["name"] = toolDoc["name"];
                 functionObj["description"] = toolDoc["description"];
                 functionObj["parameters"] = toolDoc["parameters"];
@@ -311,42 +311,42 @@ String AI_API_Grok_Handler::parseToolCallsResponseBody(const String& responsePay
     }
     
     // Check for API error
-    if (doc.containsKey("error")) {
+    if (!doc["error"].isNull()) {
         errorMsg = String("API Error: ") + (doc["error"]["message"] | "Unknown error");
         return "";
     }
     
     // Extract total tokens if available
-    if (doc.containsKey("usage") && doc["usage"].is<JsonObject>()) {
+    if (doc["usage"].is<JsonObject>()) {
         JsonObject usage = doc["usage"];
-        if (usage.containsKey("total_tokens")) {
+        if (!usage["total_tokens"].isNull()) {
             _lastTotalTokens = usage["total_tokens"].as<int>();
         }
     }
     
     // Extract finish reason and message
-    if (doc.containsKey("choices") && doc["choices"].is<JsonArray>() && doc["choices"].size() > 0) {
+    if (doc["choices"].is<JsonArray>() && doc["choices"].size() > 0) {
         JsonObject firstChoice = doc["choices"][0];
         
         // Extract finish reason
-        if (firstChoice.containsKey("finish_reason")) {
+        if (!firstChoice["finish_reason"].isNull()) {
             _lastFinishReason = firstChoice["finish_reason"].as<String>();
         }
         
-        if (firstChoice.containsKey("message") && firstChoice["message"].is<JsonObject>()) {
+        if (firstChoice["message"].is<JsonObject>()) {
             JsonObject message = firstChoice["message"];
             
             // Check if this is a tool call response
-            if (_lastFinishReason == "tool_calls" && message.containsKey("tool_calls")) {
+            if (_lastFinishReason == "tool_calls" && !message["tool_calls"].isNull()) {
                 // Serialize the tool_calls array to JSON string
-                DynamicJsonDocument toolCallsDoc(2048);
+                JsonDocument toolCallsDoc;
                 toolCallsDoc.set(message["tool_calls"]);
                 String toolCallsJson;
                 serializeJson(toolCallsDoc, toolCallsJson);
                 return toolCallsJson;
             }
             // Otherwise return regular content
-            else if (message.containsKey("content") && message["content"].is<const char*>()) {
+            else if (message["content"].is<const char*>()) {
                 return message["content"].as<String>();
             }
         }
@@ -370,46 +370,46 @@ String AI_API_Grok_Handler::buildToolCallsFollowUpRequestBody(const String& mode
     doc["model"] = modelName;
     
     // Build messages array with conversation history
-    JsonArray messages = doc.createNestedArray("messages");
+    JsonArray messages = doc["messages"].to<JsonArray>();
     
     // Add system message if provided
     if (systemMessage.length() > 0) {
-        JsonObject sysMsg = messages.createNestedObject();
+        JsonObject sysMsg = messages.add<JsonObject>();
         sysMsg["role"] = "system";
         sysMsg["content"] = systemMessage;
     }
     
     // Add original user message
-    JsonObject userMsg = messages.createNestedObject();
+    JsonObject userMsg = messages.add<JsonObject>();
     userMsg["role"] = "user";
     userMsg["content"] = lastUserMessage;
     
     // Add assistant message with tool calls
-    JsonObject assistantMsg = messages.createNestedObject();
+    JsonObject assistantMsg = messages.add<JsonObject>();
     assistantMsg["role"] = "assistant";
     assistantMsg["content"] = (const char*)nullptr; // null content for tool call messages
     
     // Parse and add tool_calls array
-    DynamicJsonDocument toolCallsDoc(2048);
+    JsonDocument toolCallsDoc;
     DeserializationError tcError = deserializeJson(toolCallsDoc, lastAssistantToolCallsJson);
     if (!tcError) {
         assistantMsg["tool_calls"] = toolCallsDoc.as<JsonArray>();
     }
     
     // Add tool results as tool messages
-    DynamicJsonDocument resultsDoc(2048);
+    JsonDocument resultsDoc;
     DeserializationError resError = deserializeJson(resultsDoc, toolResultsJson);
     if (!resError && resultsDoc.is<JsonArray>()) {
         JsonArray resultsArray = resultsDoc.as<JsonArray>();
         for (JsonObject result : resultsArray) {
-            JsonObject toolMsg = messages.createNestedObject();
+            JsonObject toolMsg = messages.add<JsonObject>();
             toolMsg["role"] = "tool";
             toolMsg["tool_call_id"] = result["tool_call_id"];
             
             // Extract the output from the function object
-            if (result.containsKey("function") && result["function"].is<JsonObject>()) {
+            if (result["function"].is<JsonObject>()) {
                 JsonObject function = result["function"];
-                if (function.containsKey("output")) {
+                if (!function["output"].isNull()) {
                     toolMsg["content"] = function["output"];
                 }
             }
@@ -417,20 +417,20 @@ String AI_API_Grok_Handler::buildToolCallsFollowUpRequestBody(const String& mode
     }
     
     // Add tools array
-    JsonArray tools = doc.createNestedArray("tools");
+    JsonArray tools = doc["tools"].to<JsonArray>();
     for (int i = 0; i < toolsArraySize; i++) {
-        DynamicJsonDocument toolDoc(1024);
+        JsonDocument toolDoc;
         DeserializationError error = deserializeJson(toolDoc, toolsArray[i]);
         if (!error) {
-            JsonObject toolObj = tools.createNestedObject();
+            JsonObject toolObj = tools.add<JsonObject>();
             
             // Check format and convert if needed
-            if (toolDoc.containsKey("type") && toolDoc["type"] == "function") {
+            if (toolDoc["type"].is<const char*>() && toolDoc["type"] == "function") {
                 toolObj["type"] = "function";
                 toolObj["function"] = toolDoc["function"];
             } else {
                 toolObj["type"] = "function";
-                JsonObject functionObj = toolObj.createNestedObject("function");
+                JsonObject functionObj = toolObj["function"].to<JsonObject>();
                 functionObj["name"] = toolDoc["name"];
                 functionObj["description"] = toolDoc["description"];
                 functionObj["parameters"] = toolDoc["parameters"];

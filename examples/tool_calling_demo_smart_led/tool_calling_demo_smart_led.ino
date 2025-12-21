@@ -538,7 +538,7 @@ void processAICommand(const String& userMessage) {
     Serial.println("🔧 AI is calling LED control functions...");
     
     // Parse and execute tool calls
-    DynamicJsonDocument doc(2048);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, result);
     
     if (error) {
@@ -547,7 +547,7 @@ void processAICommand(const String& userMessage) {
     }
     
     // Process tool calls
-    DynamicJsonDocument resultDoc(2048);
+    JsonDocument resultDoc;
     JsonArray toolResults = resultDoc.to<JsonArray>();
     JsonArray toolCalls = doc.as<JsonArray>();
     
@@ -557,7 +557,7 @@ void processAICommand(const String& userMessage) {
       String functionArgs = toolCall["function"]["arguments"].as<String>();
       
       // Parse function arguments
-      DynamicJsonDocument argsDoc(512);
+      JsonDocument argsDoc;
       deserializeJson(argsDoc, functionArgs);
       
       String functionResult = "";
@@ -588,9 +588,9 @@ void processAICommand(const String& userMessage) {
       }
       
       // Create tool result
-      JsonObject toolResult = toolResults.createNestedObject();
+      JsonObject toolResult = toolResults.add<JsonObject>();
       toolResult["tool_call_id"] = toolCallId;
-      JsonObject function = toolResult.createNestedObject("function");
+      JsonObject function = toolResult["function"].to<JsonObject>();
       function["name"] = functionName;
       function["output"] = functionResult;
     }

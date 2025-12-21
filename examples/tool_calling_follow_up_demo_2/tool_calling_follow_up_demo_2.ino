@@ -368,7 +368,7 @@ void runToolCallsDemo(String userMessage) {
     Serial.println("Tools JSON: " + result);
     
     // Parse the tool calls JSON
-    DynamicJsonDocument doc(1536); // Increased size for multiple tool calls
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, result);
     if (error) {
       Serial.println("deserializeJson() failed: " + String(error.c_str()));
@@ -376,7 +376,7 @@ void runToolCallsDemo(String userMessage) {
     }
     
     // Create a JSON array to hold tool results
-    DynamicJsonDocument resultDoc(1536);
+    JsonDocument resultDoc;
     JsonArray toolResults = resultDoc.to<JsonArray>();
     
     // Process each tool call
@@ -394,7 +394,7 @@ void runToolCallsDemo(String userMessage) {
       Serial.println("- Arguments: " + functionArgs);
       
       // Parse function arguments
-      DynamicJsonDocument argsDoc(512);
+      JsonDocument argsDoc;
       error = deserializeJson(argsDoc, functionArgs);
       if (error) {
         Serial.println("Failed to parse function arguments: " + String(error.c_str()));
@@ -406,7 +406,7 @@ void runToolCallsDemo(String userMessage) {
       
       if (functionName == "get_weather") {
         String city = argsDoc["city"].as<String>();
-        String units = argsDoc.containsKey("units") ? argsDoc["units"].as<String>() : "celsius";
+        String units = !argsDoc["units"].isNull() ? argsDoc["units"].as<String>() : "celsius";
         
         Serial.println("Executing get_weather for city: " + city + ", units: " + units);
         functionResult = getWeatherData(city, units);
@@ -415,7 +415,7 @@ void runToolCallsDemo(String userMessage) {
         String deviceType = argsDoc["device_type"].as<String>();
         String deviceId = argsDoc["device_id"].as<String>();
         String action = argsDoc["action"].as<String>();
-        String value = argsDoc.containsKey("value") ? argsDoc["value"].as<String>() : "";
+        String value = !argsDoc["value"].isNull() ? argsDoc["value"].as<String>() : "";
         
         Serial.println("Executing control_device for: " + deviceType + " " + deviceId + 
                       ", action: " + action + ", value: " + value);
@@ -425,10 +425,10 @@ void runToolCallsDemo(String userMessage) {
       Serial.println("Function result: " + functionResult);
       
       // Create a tool result object
-      JsonObject toolResult = toolResults.createNestedObject();
+      JsonObject toolResult = toolResults.add<JsonObject>();
       toolResult["tool_call_id"] = toolCallId;
       
-      JsonObject function = toolResult.createNestedObject("function");
+      JsonObject function = toolResult["function"].to<JsonObject>();
       function["name"] = functionName;
       function["output"] = functionResult;
     }

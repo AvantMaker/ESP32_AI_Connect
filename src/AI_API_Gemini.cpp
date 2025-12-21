@@ -127,8 +127,8 @@ String AI_API_Gemini_Handler::buildRequestBody(const String& modelName, const St
 
     // --- Safety Settings (Optional) ---
     // Example: Block fewer things (adjust with caution)
-    // JsonArray safetySettings = doc.createNestedArray("safetySettings");
-    // JsonObject safetySetting = safetySettings.createNestedObject();
+    // JsonArray safetySettings = doc["safetySettings"].to<JsonArray>();
+    // JsonObject safetySetting = safetySettings.add<JsonObject>();
     // safetySetting["category"] = "HARM_CATEGORY_SEXUALLY_EXPLICIT";
     // safetySetting["threshold"] = "BLOCK_MEDIUM_AND_ABOVE"; // Or BLOCK_LOW_AND_ABOVE, BLOCK_ONLY_HIGH
 

@@ -263,8 +263,8 @@ This raw response includes all fields returned by the AI platform, not just the 
 When you receive tool calls, you must parse the JSON response and execute the requested functions. A practical example of how to parse and handle tool calls can be found in the tool_calling_demo_2 example code located in the examples folder.
 
 ```cpp
-// Example parsing (requires ArduinoJson):
-DynamicJsonDocument doc(1024); // Adjust size as needed
+// Example parsing (requires ArduinoJson v7):
+JsonDocument doc;
 DeserializationError error = deserializeJson(doc, result);
 if (error) {
   Serial.print("deserializeJson() failed: ");

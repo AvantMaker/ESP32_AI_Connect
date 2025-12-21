@@ -148,7 +148,7 @@ void setup() {
     Serial.println(result); // Print the raw JSON array string of tool calls
 
     // --- Parse the tool calls (optional) ---
-    DynamicJsonDocument doc(1536); // Increased size for multiple tool calls
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, result);
     if (error) {
       Serial.print("deserializeJson() failed: ");
