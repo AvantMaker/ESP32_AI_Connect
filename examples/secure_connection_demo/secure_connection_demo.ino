@@ -31,7 +31,11 @@
 // Network credentials - REPLACE THESE WITH YOUR ACTUAL CREDENTIALS
 const char* ssid = "your_SSID";         // Your WiFi network name
 const char* password = "your_PASSWORD"; // Your WiFi password
-const char* apiKey = "your_API_KEY";    // Your OpenAI API key (keep this secure!)
+
+// AI API Configuration
+const char* apiKey = "YOUR_API_KEY";
+const char* platform = "openai";  // or "gemini", "claude", "deepseek"
+const char* model = "gpt-4.1";
 
 // Example Root CA certificate
 // Replace with actual root certificate for OpenAI API
@@ -43,11 +47,8 @@ XXXXXXXXXX
 -----END CERTIFICATE-----
 )";
 
-// Initialize AI client (insecure mode by default) with:
-// 1. Platform identifier ("openai", "gemini", or "deepseek")
-// 2. Your API key
-// 3. Model name ("gpt-4.1" for this example)
-ESP32_AI_Connect aiClient("openai", apiKey, "gpt-4.1");
+// Initialize AI client (insecure mode by default)
+ESP32_AI_Connect aiClient(platform, apiKey, model);
 
 void printSecurityStatus() {
     if (aiClient.getRootCA() == nullptr) {

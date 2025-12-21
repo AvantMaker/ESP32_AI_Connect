@@ -49,6 +49,9 @@ const char* model = "gpt-4.1";
 // Create AI client
 ESP32_AI_Connect aiClient(platform, apiKey, model);
 
+void testAIRequest();
+void testIdleScenario();
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
