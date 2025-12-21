@@ -44,19 +44,6 @@
 #define ENABLE_STREAM_CHAT
 #endif
 
-// --- Streaming Configuration ---
-// Configure streaming chat behavior (only used when ENABLE_STREAM_CHAT is defined)
-// These values can be overridden by defining them before including the library
-// or via build flags: -DSTREAM_CHAT_CHUNK_SIZE=1024
-
-#ifndef STREAM_CHAT_CHUNK_SIZE
-#define STREAM_CHAT_CHUNK_SIZE 512        // Size of each HTTP read chunk
-#endif
-
-#ifndef STREAM_CHAT_CHUNK_TIMEOUT_MS
-#define STREAM_CHAT_CHUNK_TIMEOUT_MS 5000 // Timeout for each chunk read
-#endif
-
 // --- Platform Selection ---
 // All platforms are ENABLED by default.
 // To disable a platform: define DISABLE_AI_API_<PLATFORM> before including
@@ -78,7 +65,24 @@
 #ifndef DISABLE_AI_API_CLAUDE
 #define USE_AI_API_CLAUDE        // Enable Anthropic Claude API
 #endif
+
+#ifndef DISABLE_AI_API_GROK
+#define USE_AI_API_GROK          // Enable xAI Grok API
+#endif
 // Add other platforms here as needed
+
+// --- Streaming Configuration ---
+// Configure streaming chat behavior (only used when ENABLE_STREAM_CHAT is defined)
+// These values can be overridden by defining them before including the library
+// or via build flags: -DSTREAM_CHAT_CHUNK_SIZE=1024
+
+#ifndef STREAM_CHAT_CHUNK_SIZE
+#define STREAM_CHAT_CHUNK_SIZE 512        // Size of each HTTP read chunk
+#endif
+
+#ifndef STREAM_CHAT_CHUNK_TIMEOUT_MS
+#define STREAM_CHAT_CHUNK_TIMEOUT_MS 5000 // Timeout for each chunk read
+#endif
 
 // --- Advanced Configuration ---
 // These values can be overridden by defining them before including the library
@@ -94,6 +98,42 @@
 
 #ifndef AI_API_HTTP_TIMEOUT_MS
 #define AI_API_HTTP_TIMEOUT_MS 30000 // 30 seconds
+#endif
+
+// --- Auto-Retry and Connection Resilience ---
+// Auto-retry is ENABLED by default.
+// To disable: define DISABLE_AUTO_RETRY before including the library
+// or use build flag: -DDISABLE_AUTO_RETRY
+// This feature helps maintain reliability after long idle periods or temporary network issues
+#ifndef DISABLE_AUTO_RETRY
+#define ENABLE_AUTO_RETRY
+#endif
+
+#ifdef ENABLE_AUTO_RETRY
+    // Maximum number of retry attempts per request (default: 3)
+    // Total attempts = 1 initial + MAX_ATTEMPTS retries
+    #ifndef AUTO_RETRY_MAX_ATTEMPTS
+    #define AUTO_RETRY_MAX_ATTEMPTS 3
+    #endif
+    
+    // Initial retry delay in milliseconds (default: 1000ms = 1 second)
+    // Delay doubles with each retry using exponential backoff
+    #ifndef AUTO_RETRY_INITIAL_DELAY_MS
+    #define AUTO_RETRY_INITIAL_DELAY_MS 1000
+    #endif
+    
+    // Maximum retry delay in milliseconds (default: 10000ms = 10 seconds)
+    // Caps the exponential backoff to prevent excessive wait times
+    #ifndef AUTO_RETRY_MAX_DELAY_MS
+    #define AUTO_RETRY_MAX_DELAY_MS 10000
+    #endif
+    
+    // Stale connection threshold in milliseconds (default: 300000ms = 5 minutes)
+    // If time since last successful request exceeds this, HTTP/WiFi client objects
+    // are cleaned up and reinitialized to prevent stale connection issues
+    #ifndef AUTO_RETRY_STALE_CONNECTION_THRESHOLD_MS
+    #define AUTO_RETRY_STALE_CONNECTION_THRESHOLD_MS 300000
+    #endif
 #endif
 
 #endif // ESP32_AI_CONNECT_CONFIG_H

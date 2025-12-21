@@ -5,7 +5,7 @@
 [![Language](https://img.shields.io/badge/Language-Arduino-teal.svg)](https://www.arduino.cc/)
 [![AvantMaker](https://img.shields.io/badge/By-AvantMaker-red.svg)](https://www.avantmaker.com)
 ---
-> README Version 0.0.6 • Revised: August 6, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
+> README Version 0.0.7 • Revised: December 15, 2025 • Author: AvantMaker • [https://www.AvantMaker.com](https://www.AvantMaker.com)
 
 This project is proudly brought to you by the team at **AvantMaker.com**.
 
@@ -31,6 +31,7 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 - **Tool calls support**: Enables tool call capabilities with AI models
 - **Streaming support**: Supports streaming communication with AI model, featuring thread safety, user interruption, etc.
 - **Secure connections**: Optional SSL/TLS certificate verification for production deployments
+- **Auto-retry and resilience**: Optional automatic retry with exponential backoff for transient failures (NEW!)
 - **Expandable framework**: Built to easily accommodate additional model support
 - **Configurable features**: Enable/disable tool calls feature to optimize microcontroller resources
 - **OpenAI-compatible support**: Use alternative platforms by supplying custom endpoints and model names
@@ -49,14 +50,15 @@ ESP32_AI_Connect is an Arduino library that enables ESP32 microcontrollers to in
 | Platform          | Identifier           | Example Models                  | Tool Calls Support | Streaming Support |
 |-------------------|----------------------|---------------------------------|-------------------|-------------------|
 | OpenAI            | `"openai"`           | gpt-4.1, gpt-4o-mini, etc.           | Yes               | Yes               |
-| Google Gemini     | `"gemini"`           | gemini-2.5-flash, gemini-2.5-pro, etc.                | Yes                | Yes               |
+| Google Gemini     | `"gemini"`           | gemini-3-flash, gemini-3-pro, etc.                | Yes                | Yes               |
 | DeepSeek          | `"deepseek"`         | deepseek-chat, etc.                   | Yes               | Yes                |
 | Anthropic Claude | `"claude"`| claude-sonnet-4, claude-opus-4, etc.               | Yes               | Yes                |
+| xAI Grok | `"grok"`| grok-4, grok-4-fast, etc.               | Yes               | Yes                |
 | OpenAI Compatible | `"openai-compatible"`| HuggingFace, OpenRouter, etc.                       | See Note 1 below               | See Note 1 below               |
 
 **Note 1:** Tool calls and Streaming support differ by AI platform and LLM model, so the availability of the `tool_calls` and `streaming` feature on the OpenAI Compatible platform depends on your chosen platform and model.
 
-**Note 2:** We are actively working to add Grok and Ollama to the list of supported platforms.
+**Note 2:** We are actively working to add Ollama to the list of supported platforms.
 
 
 ## Dependency
@@ -221,6 +223,17 @@ aiClient.setRootCA(nullptr);
 
 See the `secure_connection_demo` example for a complete demonstration.
 
+## Auto-Retry and Connection Resilience
+The optional auto-retry feature ensures reliable operation in real-world IoT deployments, especially for applications like AI-powered home assistants that may idle for extended periods. This feature provides:
+
+- **WiFi Health Check**: Verifies WiFi connection before each request
+- **Stale Connection Cleanup**: Automatically refreshes connections after idle periods (default: 5 minutes)
+- **Smart Retry Logic**: Automatically retries failed requests with exponential backoff
+- **Error Classification**: Distinguishes between retryable (5xx, timeout) and non-retryable (4xx) errors
+- **Zero Overhead**: Minimal resource usage, enabled by default (can be disabled via config)
+- **Transparent Operation**: Works silently in the background, no code changes needed
+- **Applies to**: `chat()` and `tcChat()` methods (streaming gets WiFi check + cleanup only)
+
 ## User Guide
 
 For detailed instructions on how to use this library, please refer to the comprehensive User Guide documents in the `doc/User Guide` folder. The User Guide includes:
@@ -247,6 +260,7 @@ All platforms and features are **enabled by default**. Override settings without
 #define DISABLE_TOOL_CALLS
 #define DISABLE_DEBUG_OUTPUT
 #define DISABLE_STREAM_CHAT
+#define DISABLE_AUTO_RETRY
 
 // Adjust buffer sizes if needed (defaults: 5120, 2048, 30000)
 #define AI_API_REQ_JSON_DOC_SIZE 8192
